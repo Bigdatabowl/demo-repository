@@ -54,35 +54,67 @@ week1rushtackle <- left_join(week1rushtackle, players, by = c("foulNFLId1" = "nf
   rename("foulPlayer" = "displayName")
 
 week1rushplay <- semi_join(week1, week1rushtackle, by = c("gameId", "playId"))
+week1rushplay <- week1rushplay[week1rushplay$displayName != "football", ]
+week1football <- week1rushplay[week1rushplay$displayName == "football", ]
+
+week1dist <- merge(week1rushplay, week1football, by = c("gameId", "playId", "frameId", "time"), all.x = T)
+week1dist <- week1dist %>% 
+  select(-18, -20, -21, -22, -30)
+
+week1dist <- week1dist %>% 
+  rename(nflId = nflId.x,
+         displayName = displayName.x,
+         jerseyNumber = jerseyNumber.x,
+         club = club.x,
+         playDirection = playDirection.x,
+         x.player = x.x,
+         y.player = y.x,
+         s.player = s.x,
+         a.player = a.x,
+         dis.player = dis.x,
+         o.player = o.x,
+         dir.player = dir.x,
+         event = event.x,
+         football = displayName.y,
+         x.ball = x.y,
+         y.ball = y.y,
+         s.ball = s.y,
+         a.ball = a.y,
+         dis.ball = dis.y,
+         o.ball = o.y,
+         dir.ball = dir.y)
+
+week1dist$distance <- sqrt((week1dist$x.player - week1dist$x.ball)^2 + (week1dist$y.player - week1dist$y.ball)^2)
 
 football_pos <- week1rushplay %>% 
   filter(club=="football")
 unique_football <- football_pos %>% 
   distinct(gameId, playId)
 
-dist_list <- list()
 
-for (i in seq_along(unique_football)) {
-  
-  game_id <- unique_football$gameId[i]
-  play_id <- unique_football$playId[i]
-  
-  unique_play <- week1rushplay %>%
-    filter(gameId == game_id, playId == play_id)
-  
-  football_xy <- unique_play %>% 
-    filter(club == "football") %>% 
-    select(x,y)
-  
-  player_xy <- unique_play %>%
-    filter(club != "football") %>%
-    select(displayName, nflId, x, y)
-  
-  distances <- player_xy %>%
-    mutate(distance = sqrt((x - football_xy$x)^2 + (y - football_xy$y)^2))
-  
-  dist_list[[i]] <- distances
-}
+# dist_list <- list()
+# 
+# for (i in seq_along(unique_football)) {
+#   
+#   game_id <- unique_football$gameId[i]
+#   play_id <- unique_football$playId[i]
+#   
+#   unique_play <- week1rushplay %>%
+#     filter(gameId == game_id, playId == play_id)
+#   
+#   football_xy <- unique_play %>% 
+#     filter(club == "football") %>% 
+#     select(x,y)
+#   
+#   player_xy <- unique_play %>%
+#     filter(club != "football") %>%
+#     select(displayName, nflId, x, y)
+#   
+#   distances <- player_xy %>%
+#     mutate(distance = sqrt((x - football_xy$x)^2 + (y - football_xy$y)^2))
+#   
+#   dist_list[[i]] <- distances
+# }
 #players distance from the ball
 
 
