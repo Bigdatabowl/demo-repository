@@ -1,4 +1,4 @@
-setwd("C:/Users/roymy/OneDrive/바탕화~2-DESKTOP-TTPA583-6709/Big data bowl")
+setwd("C:/Users/roymy/OneDrive/바탕 화면/Big data bowl")
 library(tidyverse)
 library(ggplot2)
 library(gganimate)
@@ -54,10 +54,10 @@ week1rushtackle <- left_join(week1rushtackle, players, by = c("foulNFLId1" = "nf
   rename("foulPlayer" = "displayName")
 
 week1rushplay <- semi_join(week1, week1rushtackle, by = c("gameId", "playId"))
-week1rushplay <- week1rushplay[week1rushplay$displayName != "football", ]
-week1football <- week1rushplay[week1rushplay$displayName == "football", ]
+week1rushplayer <- week1rushplay[week1rushplay$displayName != "football", ]
+week1rushfootball <- week1rushplay[week1rushplay$displayName == "football", ]
 
-week1dist <- merge(week1rushplay, week1football, by = c("gameId", "playId", "frameId", "time"), all.x = T)
+week1dist <- merge(week1rushplayer, week1rushfootball, by = c("gameId", "playId", "frameId", "time"), all.x = T)
 week1dist <- week1dist %>% 
   select(-18, -20, -21, -22, -30)
 
@@ -85,11 +85,26 @@ week1dist <- week1dist %>%
          dir.ball = dir.y)
 
 week1dist$distance <- sqrt((week1dist$x.player - week1dist$x.ball)^2 + (week1dist$y.player - week1dist$y.ball)^2)
+week1dist <- week1dist %>% 
+  select(-25)
 
-football_pos <- week1rushplay %>% 
-  filter(club=="football")
-unique_football <- football_pos %>% 
-  distinct(gameId, playId)
+week1tackledist <- left_join(week1dist, tackle_rushplay, by = c("gameId", "nflId", "playId"))
+week1tackledist <- week1tackledist %>% 
+  select(-30, -31, -43:-48)
+
+week1tackledist <- week1tackledist %>% 
+  group_by(gameId, playId, event, frameId) %>% 
+  mutate(player_order = rank(distance)) %>% 
+  ungroup
+
+View(week1tackledist %>% filter(playId == 101 & gameId == 2022090800))
+
+
+# football_pos <- week1rushplay %>% 
+#   filter(club=="football")
+# unique_football <- football_pos %>% 
+#   distinct(gameId, playId)
+# 
 
 
 # dist_list <- list()
