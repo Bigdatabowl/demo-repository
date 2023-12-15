@@ -1,8 +1,8 @@
-setwd("C:/Users/roymy/OneDrive/바탕 화면/Big data bowl")
 library(tidyverse)
 library(ggplot2)
-library(gganimate)
+#library(gganimate)
 
+setwd("C:/Users/dhaks/OneDrive/Desktop/Big Data Bowl")
 games <- read.csv("games.csv")
 players <- read.csv("players.csv")
 plays <- read.csv("plays.csv")
@@ -97,7 +97,23 @@ week1tackledist <- week1tackledist %>%
   mutate(player_order = rank(distance)) %>% 
   ungroup
 
-View(week1tackledist %>% filter(playId == 101 & gameId == 2022090800))
+frame_diff <- week1tackledist %>% 
+  select(gameId, playId, frameId, event) %>% 
+  group_by(gameId) %>% 
+  distinct(frameId, playId, event) %>% 
+  ungroup() %>% 
+  group_by(gameId, playId) %>% 
+  filter(event == 'ball_snap' | event == 'first_contact' | event == 'tackle' | event == 'touchdown') %>% 
+  pivot_wider(names_from = event, values_from = frameId) %>% 
+  mutate(tackle_fc = tackle - first_contact) %>% 
+  left_join(tackles, by = c("gameId", "playId")) %>% 
+  select(1:7, forcedFumble, pff_missedTackle)
+
+
+
+oneplay <- week1tackledist %>% filter(playId == 101 & gameId == 2022090800)
+
+
 
 
 # football_pos <- week1rushplay %>% 
