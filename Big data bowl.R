@@ -1,8 +1,8 @@
+setwd("C:/Users/roymy/OneDrive/바탕 화면/Big data bowl")
 library(tidyverse)
 library(ggplot2)
-#library(gganimate)
+library(gganimate)
 
-setwd("C:/Users/dhaks/OneDrive/Desktop/Big Data Bowl")
 games <- read.csv("games.csv")
 players <- read.csv("players.csv")
 plays <- read.csv("plays.csv")
@@ -97,6 +97,9 @@ week1tackledist <- week1tackledist %>%
   mutate(player_order = rank(distance)) %>% 
   ungroup
 
+View(week1tackledist %>% filter(playId == 101 & gameId == 2022090800))
+
+
 frame_diff <- week1tackledist %>% 
   select(gameId, playId, frameId, event) %>% 
   group_by(gameId) %>% 
@@ -109,12 +112,39 @@ frame_diff <- week1tackledist %>%
   left_join(tackles, by = c("gameId", "playId")) %>% 
   select(1:7, forcedFumble, pff_missedTackle)
 
+players <- players %>% 
+  mutate(OD = as.factor(ifelse(position %in% c("QB", "T", "TE", "WR", "G", "RB", "C", "FB", "LS"), "Offense", "Defense")))
+
+new_players <- data.frame(
+  displayName = c("Robby Anderson", "Cameron Sample", "Zachary Carter", "Daxton Hill", "Jacob Martin"),
+  OD = c("Offense", "Defense", "Defense", "Defense", "Defense"),
+  position = c("WR", "DE", "DT", "SS", "DE"),
+  nflId = c(43808, 53540, 54560, 54496, 46255)
+)
+
+players <- bind_rows(players, new_players)
 
 
-oneplay <- week1tackledist %>% filter(playId == 101 & gameId == 2022090800)
+##week1tackdist and players
+week1tackledistpos <- left_join(week1tackledist, 
+                                players %>% select(nflId, displayName, OD), 
+                                by = c("nflId", "displayName"))
 
 
+#join plays(from plays only select gameid, playid, ballcarrierId) and week1tackdist
+week1ballcarrier <- left_join(week1tackledistpos,
+                              plays %>% select(gameId, playId, ballCarrierId),
+                              by = c("gameId", "playId"))
+week1ballcarrier <- week1ballcarrier %>%
+  select(-32) %>% 
+  rename(ballCarrierId = ballCarrierId.y)
 
+#after joining mutate new column for who the ballcarrier is, if ballcarrierId == playerID then set it equal to 1
+week1ballcarrier <- week1ballcarrier %>% 
+  mutate(BallCarrier = ifelse(ballCarrierId == nflId, 1, 0))
+
+week1ballcarrier <- week1ballcarrier %>% 
+  filter(OD == "Defense" | (OD =="Offense" & BallCarrier == 1))
 
 # football_pos <- week1rushplay %>% 
 #   filter(club=="football")
