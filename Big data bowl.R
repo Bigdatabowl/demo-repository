@@ -1,4 +1,4 @@
-setwd("C:/Users/roymy/OneDrive/바탕 화면/Big data bowl")
+setwd("C:/Users/roymy/OneDrive/바탕화~2-DESKTOP-TTPA583-6709/Big data bowl")
 library(tidyverse)
 library(ggplot2)
 library(gganimate)
@@ -146,6 +146,80 @@ week1ballcarrier <- week1ballcarrier %>%
 week1ballcarrier <- week1ballcarrier %>% 
   filter(OD == "Defense" | (OD =="Offense" & BallCarrier == 1))
 
+
+###EDA
+tackle_assist <- week1ballcarrier %>%
+  group_by(quarter, down, yardsToGo, defendersInTheBox) %>%
+  summarise(
+    total_tackle = sum(tackle, na.rm = TRUE),
+    total_assist = sum(assist, na.rm = TRUE)
+  ) %>%
+  ungroup()
+
+ggplot(tackle_assist, aes(x = quarter, y = total_tackle, fill = as.factor(down))) +
+  geom_bar(stat = "identity", position = "dodge", color = "white") +
+  labs(title = "Total Tackles by Quarter and Down",
+       x = "Quarter",
+       y = "Total Tackles",
+       fill = "Down") +
+  theme_minimal()
+
+ggplot(tackle_assist, aes(x = quarter, y = total_assist, fill = as.factor(down))) +
+  geom_bar(stat = "identity", position = "dodge", color = "white") +
+  labs(title = "Total Assists by Quarter and Down",
+       x = "Quarter",
+       y = "Total Assists",
+       fill = "Down") +
+  theme_minimal()
+
+missing_values <- tackle_assist[is.na(tackle_assist$total_tackle) | is.na(tackle_assist$total_assist), ]
+
+print(missing_values)
+
+ggplot(tackle_assist, aes(x = yardsToGo, y = total_tackle, fill = as.factor(down))) +
+  geom_bar(stat = "identity", position = "dodge", color = "white") +
+  labs(title = "Total Tackles by YardsToGo, Down, and Defenders in the Box",
+       x = "YardsToGo",
+       y = "Total Tackles",
+       fill = "Down") +
+  facet_grid(quarter ~ defendersInTheBox) +
+  theme_minimal()
+
+ggplot(tackle_assist, aes(x = yardsToGo, y = total_assist, fill = as.factor(down))) +
+  geom_bar(stat = "identity", position = "dodge", color = "white") +
+  labs(title = "Total Assists by YardsToGo, Down, and Defenders in the Box",
+       x = "YardsToGo",
+       y = "Total Assists",
+       fill = "Down") +
+  facet_grid(quarter ~ defendersInTheBox) +
+  theme_minimal()
+
+
+tackle_assist_2 <- week1ballcarrier %>%
+  group_by(quarter, down, playDirection, yardsToGo) %>%
+  summarise(
+    total_tackle = sum(tackle, na.rm = TRUE),
+    total_assist = sum(assist, na.rm = TRUE)
+  ) %>%
+  ungroup()
+
+ggplot(tackle_assist_2, aes(x = yardsToGo, y = total_tackle, fill = as.factor(down))) +
+  geom_bar(stat = "identity", position = "dodge", color = "white") +
+  labs(title = "Total Tackles by PlayDirection, Distance, and Down",
+       x = "Distance",
+       y = "Total Tackles",
+       fill = "Down") +
+  facet_grid(quarter ~ playDirection) +
+  theme_minimal()
+
+ggplot(tackle_assist_2, aes(x = yardsToGo, y = total_assist, fill = as.factor(down))) +
+  geom_bar(stat = "identity", position = "dodge", color = "white") +
+  labs(title = "Total Assists by PlayDirection, Distance, and Down",
+       x = "Distance",
+       y = "Total Assists",
+       fill = "Down") +
+  facet_grid(quarter ~ playDirection) +
+  theme_minimal()
 # football_pos <- week1rushplay %>% 
 #   filter(club=="football")
 # unique_football <- football_pos %>% 
