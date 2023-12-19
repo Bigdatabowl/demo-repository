@@ -1,8 +1,8 @@
-setwd("C:/Users/roymy/OneDrive/바탕화~2-DESKTOP-TTPA583-6709/Big data bowl")
 library(tidyverse)
 library(ggplot2)
 library(gganimate)
 
+setwd("C:/Users/dhaks/OneDrive/Desktop/Big Data Bowl")
 games <- read.csv("games.csv")
 players <- read.csv("players.csv")
 plays <- read.csv("plays.csv")
@@ -34,7 +34,7 @@ tackleplay <- tackleplay %>%
   select(-birthDate, -collegeName) %>% 
   rename("tacklePlayer" = "displayName") %>% 
   rename("ballCarrier" = "ballCarrierDisplayName")
- 
+
 tackle_passplay <- tackleplay %>% 
   filter(passResult == "C")
 
@@ -148,15 +148,43 @@ week1ballcarrier <- week1ballcarrier %>%
 
 
 ###EDA
+tackle_by_team <- week1ballcarrier %>% 
+  group_by(playId, club, down, yardsToGo) %>% 
+  summarise(
+    total_tackle = max(tackle, na.rm = TRUE),
+    total_assist = max(assist, na.rm = TRUE),
+    total_missed = max(pff_missedTackle, na.rm = T)
+    ) %>% 
+  ungroup() %>% 
+  group_by(club, yardsToGo) %>% 
+  summarise(
+    total_tackle = sum(total_tackle, na.rm = TRUE),
+    total_assist = sum(total_assist, na.rm = TRUE),
+    total_missed = sum(total_missed, na.rm = T)
+  ) %>% 
+  mutate(total_attempts = total_tackle+total_missed,
+         tackle_per = total_tackle/total_attempts)
+
+
+ggplot(data = tackle_by_team, aes())
+
+# Make a line graph to show team success rates of tackles based on down and yards to go
 tackle_assist <- week1ballcarrier %>%
-  group_by(quarter, down, yardsToGo, defendersInTheBox) %>%
+  group_by(playId, quarter, down, yardsToGo, defendersInTheBox) %>%
   summarise(
     total_tackle = sum(tackle, na.rm = TRUE),
-    total_assist = sum(assist, na.rm = TRUE)
+    total_assist = sum(assist, na.rm = TRUE),
+    total_missed = sum(pff_missedTackle, na.rm = T)
   ) %>%
-  ungroup()
+  ungroup()%>% 
+  group_by(quarter, down, yardsToGo) %>% 
+  summarise(
+    total_tackle = sum(total_tackle, na.rm = TRUE),
+    total_assist = sum(total_assist, na.rm = TRUE),
+    total_missed = sum(total_missed, na.rm = T)
+  )
 
-ggplot(tackle_assist, aes(x = quarter, y = total_tackle, fill = as.factor(down))) +
+ggplot(tackle_assist, aes(x = quarter, y = total_missed, fill = as.factor(down))) +
   geom_bar(stat = "identity", position = "dodge", color = "white") +
   labs(title = "Total Tackles by Quarter and Down",
        x = "Quarter",
@@ -220,6 +248,17 @@ ggplot(tackle_assist_2, aes(x = yardsToGo, y = total_assist, fill = as.factor(do
        fill = "Down") +
   facet_grid(quarter ~ playDirection) +
   theme_minimal()
+
+
+######
+
+# 1.Analyze yards saved by tackles, build a model to predict yards gained per play
+# 2.and analyze tackle success rate based on area of field(open field, behind the line of scrimmage, etc.)
+# 3.potentially analyze largest distance covered to make a tackle ()
+
+
+######
+
 # football_pos <- week1rushplay %>% 
 #   filter(club=="football")
 # unique_football <- football_pos %>% 
