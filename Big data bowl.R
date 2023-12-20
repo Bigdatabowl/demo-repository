@@ -134,7 +134,7 @@ week1tackledistpos <- left_join(week1tackledist,
 
 #join plays(from plays only select gameid, playid, ballcarrierId) and week1tackdist
 week1ballcarrier <- left_join(week1tackledistpos,
-                              plays %>% select(gameId, playId, ballCarrierId),
+                              plays %>% select(gameId, playId, ballCarrierId, preSnapHomeScore, preSnapVisitorScore, offenseFormation),
                               by = c("gameId", "playId"))
 week1ballcarrier <- week1ballcarrier %>%
   select(-32) %>% 
@@ -265,11 +265,12 @@ distance_change <- ballcarrier %>%
   group_by(gameId, playId, nflId, displayName) %>%
   mutate(distance_change = lead(distance) - lag(distance, default = first(distance)))
 
-distance_change <- distance_change %>% 
-  mutate(yards_saved = yardsToGo - last(playResult))
+# distance_change <- distance_change %>% 
+#   mutate(yards_to_FD = yardsToGo - last(playResult))
 
-
-
+##https://www.kaggle.com/code/seanyman84/nfl-rush-prediction
+##offense formation, defender in the box, down, yardsToGo, yards till the end zone, presnapHometeamscore - presnapvisitorteamscore
+##plays data, games data
 ######
 
 # 1.Analyze yards saved by tackles, build a model to predict yards gained per play
