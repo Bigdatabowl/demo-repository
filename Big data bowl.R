@@ -2,7 +2,8 @@ library(tidyverse)
 library(ggplot2)
 library(gganimate)
 
-setwd("C:/Users/dhaks/OneDrive/Desktop/Big Data Bowl")
+setwd("C:/Users/roymy/OneDrive/바탕화~2-DESKTOP-TTPA583-6709/Big data bowl")
+###setwd("C:/Users/dhaks/OneDrive/Desktop/Big Data Bowl")
 games <- read.csv("games.csv")
 players <- read.csv("players.csv")
 plays <- read.csv("plays.csv")
@@ -249,7 +250,20 @@ ggplot(tackle_assist_2, aes(x = yardsToGo, y = total_assist, fill = as.factor(do
   facet_grid(quarter ~ playDirection) +
   theme_minimal()
 
+ballcarrier <- week1ballcarrier %>%
+  select(gameId, playId, frameId, time, nflId, displayName, club,
+         s.player, x.player, y.player, a.player, dis.player, o.player, dir.player, playDirection,
+         event, x.ball, y.ball, s.ball, a.ball, dis.ball, o.ball, distance,
+         tackle, assist, tacklePlayer, ballCarrier, quarter, down, yardsToGo, playResult)
 
+ballcarrier <- ballcarrier %>% 
+  filter(event %in% c("ball_snap", "tackle"))
+
+
+distance_change <- ballcarrier %>% 
+  arrange(gameId, playId, nflId, time) %>%
+  group_by(gameId, playId, nflId, displayName) %>%
+  mutate(distance_change = lead(distance) - lag(distance, default = first(distance)))
 ######
 
 # 1.Analyze yards saved by tackles, build a model to predict yards gained per play
