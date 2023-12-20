@@ -264,6 +264,12 @@ distance_change <- ballcarrier %>%
   arrange(gameId, playId, nflId, time) %>%
   group_by(gameId, playId, nflId, displayName) %>%
   mutate(distance_change = lead(distance) - lag(distance, default = first(distance)))
+
+distance_change <- distance_change %>% 
+  mutate(yards_saved = yardsToGo - last(playResult))
+
+
+
 ######
 
 # 1.Analyze yards saved by tackles, build a model to predict yards gained per play
