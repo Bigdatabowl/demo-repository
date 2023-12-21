@@ -134,11 +134,9 @@ week1tackledistpos <- left_join(week1tackledist,
 
 #join plays(from plays only select gameid, playid, ballcarrierId) and week1tackdist
 week1ballcarrier <- left_join(week1tackledistpos,
-                              plays %>% select(gameId, playId, ballCarrierId, preSnapHomeScore, preSnapVisitorScore, offenseFormation),
+                              plays %>% select(gameId, playId, preSnapHomeScore, preSnapVisitorScore, yardlineNumber, 
+                                               preSnapHomeScore, preSnapVisitorScore),
                               by = c("gameId", "playId"))
-week1ballcarrier <- week1ballcarrier %>%
-  select(-32) %>% 
-  rename(ballCarrierId = ballCarrierId.y)
 
 #after joining mutate new column for who the ballcarrier is, if ballcarrierId == playerID then set it equal to 1
 week1ballcarrier <- week1ballcarrier %>% 
@@ -147,6 +145,9 @@ week1ballcarrier <- week1ballcarrier %>%
 week1ballcarrier <- week1ballcarrier %>% 
   filter(OD == "Defense" | (OD =="Offense" & BallCarrier == 1))
 
+week1ballcarrier <- left_join(week1ballcarrier,
+                              games %>% select(gameId, week, gameDate, homeTeamAbbr, visitorTeamAbbr),
+                              by = c("gameId"))
 
 ###EDA
 tackle_by_team <- week1ballcarrier %>% 
@@ -250,13 +251,13 @@ ggplot(tackle_assist_2, aes(x = yardsToGo, y = total_assist, fill = as.factor(do
   facet_grid(quarter ~ playDirection) +
   theme_minimal()
 
-ballcarrier <- week1ballcarrier %>%
-  select(gameId, playId, frameId, time, nflId, displayName, club,
-         s.player, x.player, y.player, a.player, dis.player, o.player, dir.player, playDirection,
-         event, x.ball, y.ball, s.ball, a.ball, dis.ball, o.ball, distance,
-         tackle, assist, tacklePlayer, ballCarrier, quarter, down, yardsToGo, playResult)
+# ballcarrier <- week1ballcarrier %>%
+#   select(gameId, playId, frameId, time, nflId, displayName, club,
+#          s.player, x.player, y.player, a.player, dis.player, o.player, dir.player, playDirection,
+#          event, x.ball, y.ball, s.ball, a.ball, dis.ball, o.ball, distance,
+#          tackle, assist, tacklePlayer, ballCarrier, quarter, down, yardsToGo, playResult)
 
-ballcarrier <- ballcarrier %>% 
+ballcarrier <- week1ballcarrier %>% 
   filter(event %in% c("ball_snap", "tackle"))
 
 
@@ -267,6 +268,26 @@ distance_change <- ballcarrier %>%
 
 # distance_change <- distance_change %>% 
 #   mutate(yards_to_FD = yardsToGo - last(playResult))
+
+
+distance_change <- distance_change %>% 
+  rename(Home = homeTeamAbbr,
+         Visitor = visitorTeamAbbr,
+         Home_score = preSnapHomeScore,
+         Visitor_score = preSnapVisitorScore)
+
+distance_change <- distance_change %>% 
+  mutate(yardstoEnd = ifelse(
+    possessionTeam == yardlineSide,
+    100 - yardlineNumber,
+    yardlineNumber
+  ),
+  Scorediff = ifelse(
+    possessionTeam == Home,
+    Home_score - Visitor_score,
+    Visitor_score - Home_score
+  )
+  )  
 
 ##https://www.kaggle.com/code/seanyman84/nfl-rush-prediction
 ##offense formation, defender in the box, down, yardsToGo, yards till the end zone, presnapHometeamscore - presnapvisitorteamscore
