@@ -1,6 +1,7 @@
 library(tidyverse)
 library(ggplot2)
 library(gganimate)
+library(nflverse)
 
 setwd("C:/Users/roymy/OneDrive/바탕화~2-DESKTOP-TTPA583-6709/Big data bowl")
 ###setwd("C:/Users/dhaks/OneDrive/Desktop/Big Data Bowl")
@@ -292,6 +293,18 @@ distance_change <- distance_change %>%
     Visitor_score - Home_score
   )
   )  
+
+
+pbp <- load_pbp(seasons = 2022)
+team_box <- pbp %>% 
+  group_by(game_id, defteam, play_type, week) %>% 
+  summarise(total_yards = sum(yards_gained),
+            total_plays = n()) %>% 
+  ungroup() %>% 
+  filter(play_type %in% c('pass', 'run')) %>% 
+  mutate(yards_per_attempt = total_yards / total_plays) %>% 
+  pivot_wider(names_from = play_type, names_glue = "{play_type}_{.value}",values_from = c(total_yards, total_plays, yards_per_attempt))
+  
 
 ##https://www.kaggle.com/code/seanyman84/nfl-rush-prediction
 ##offense formation, defender in the box, down, yardsToGo, yards till the end zone, presnapHometeamscore - presnapvisitorteamscore
