@@ -258,13 +258,17 @@ ggplot(tackle_assist_2, aes(x = yardsToGo, y = total_assist, fill = as.factor(do
 #          tackle, assist, tacklePlayer, ballCarrier, quarter, down, yardsToGo, playResult)
 
 ballcarrier <- week1ballcarrier %>% 
-  filter(event %in% c("ball_snap", "tackle"))
+  filter(event %in% c("ball_snap", "first_contact", "tackle"))
 
 
-distance_change <- ballcarrier %>% 
+distance_change <- ballcarrier %>%
   arrange(gameId, playId, nflId, time) %>%
   group_by(gameId, playId, nflId, displayName) %>%
-  mutate(distance_change = lead(distance) - lag(distance, default = first(distance)))
+  filter(event %in% c("ball_snap", "first_contact", "tackle")) %>%
+  mutate(
+    distance_change_first_contact = distance - lag(distance),
+    distance_change_tackle = distance - lag(distance, default = first(distance))
+  )
 
 # distance_change <- distance_change %>% 
 #   mutate(yards_to_FD = yardsToGo - last(playResult))
