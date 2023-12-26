@@ -293,16 +293,42 @@ distance_change <- distance_change %>%
   )
   )  
 
+
 pbp <- load_pbp(seasons = 2022)
-team_box <- pbp %>% 
+team_box_def <- pbp %>% 
   group_by(game_id, defteam, play_type, week) %>% 
   summarise(total_yards = sum(yards_gained),
             total_plays = n()) %>% 
   ungroup() %>% 
   filter(play_type %in% c('pass', 'run')) %>% 
-  mutate(yards_per_attempt = total_yards / total_plays) %>% 
-  pivot_wider(names_from = play_type, names_glue = "{play_type}_{.value}",values_from = c(total_yards, total_plays, yards_per_attempt)) %>% 
-  filter(week %in% 1:9)
+  mutate(yards_per_attempt_def = total_yards / total_plays) %>% 
+  pivot_wider(names_from = play_type, names_glue = "{play_type}_{.value}",values_from = c(total_yards, total_plays, yards_per_attempt_def)) %>% 
+  filter(week<=9)
+
+team_box_off <- pbp %>% 
+  group_by(game_id, posteam, play_type, week) %>% 
+  summarise(total_yards = sum(yards_gained),
+            total_plays = n()) %>% 
+  ungroup() %>% 
+  filter(play_type %in% c('pass', 'run')) %>% 
+  mutate(yards_per_attempt_off = total_yards / total_plays) %>% 
+  pivot_wider(names_from = play_type, names_glue = "{play_type}_{.value}",values_from = c(total_yards, total_plays, yards_per_attempt_off)) %>% 
+  filter(week<=9)
+
+off_box <- team_box_off %>% 
+  group_by(posteam) %>%
+  arrange(week) %>% 
+  mutate(across(pass_total_yards:run_total_plays, cumsum, .names = "season_total_{col}")) %>% 
+  mutate(pass_yards_per_attempt_off = lag(season_total_pass_total_yards/season_total_pass_total_plays),
+         run_yards_per_attempt_off = lag(season_total_run_total_yards/season_total_run_total_plays))
+
+def_box <- team_box_def %>% 
+  group_by(defteam) %>%
+  arrange(week) %>% 
+  mutate(across(pass_total_yards:run_total_plays, cumsum, .names = "season_total_{col}")) %>% 
+  mutate(pass_yards_per_attempt_def = lag(season_total_pass_total_yards/season_total_pass_total_plays),
+         run_yards_per_attempt_def = lag(season_total_run_total_yards/season_total_run_total_plays))
+
 
 ##week1 passing play
 week1passtackle <- tackle_passplay %>% 
