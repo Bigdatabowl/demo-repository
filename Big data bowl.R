@@ -442,6 +442,8 @@ distance_change_pass <- distance_change_pass %>%
   )
   )  
 
+saveRDS(distance_change_pass, 'distance_pass.rds')
+#Join box score stats by week and posTeam and DefTeam
 
 ##https://www.kaggle.com/code/seanyman84/nfl-rush-prediction
 ##offense formation, defender in the box, down, yardsToGo, yards till the end zone, presnapHometeamscore - presnapvisitorteamscore
