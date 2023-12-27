@@ -152,17 +152,17 @@ weektackledist <- weektackledist %>%
 ##View(weektackledist %>% filter(playId == 101 & gameId == 2022090800))
 
 
-frame_diff <- weektackledist %>% 
-  select(gameId, playId, frameId, event) %>% 
-  group_by(gameId) %>% 
-  distinct(frameId, playId, event) %>% 
-  ungroup() %>% 
-  group_by(gameId, playId) %>% 
-  filter(event == 'ball_snap' | event == 'first_contact' | event == 'tackle' | event == 'touchdown') %>% 
-  pivot_wider(names_from = event, values_from = frameId) %>% 
-  mutate(tackle_fc = tackle - first_contact) %>% 
-  left_join(tackles, by = c("gameId", "playId")) %>% 
-  select(1:7, forcedFumble, pff_missedTackle)
+# frame_diff <- weektackledist %>% 
+#   select(gameId, playId, frameId, event) %>% 
+#   group_by(gameId) %>% 
+#   distinct(frameId, playId, event) %>% 
+#   ungroup() %>% 
+#   group_by(gameId, playId) %>% 
+#   filter(event == 'ball_snap' | event == 'first_contact' | event == 'tackle' | event == 'touchdown') %>% 
+#   pivot_wider(names_from = event, values_from = frameId) %>% 
+#   mutate(tackle_fc = tackle - first_contact) %>% 
+#   left_join(tackles, by = c("gameId", "playId")) %>% 
+#   select(1:7, forcedFumble, pff_missedTackle)
 
 
 
@@ -371,8 +371,9 @@ for (n in 1:9) {
   all_plays[[n]] <- all_play(week_data)
 }
 
-final_data <- bind_rows(all_weeks_data)
-
+final_data <- bind_rows(all_plays)
+save(final_data, file = 'finaldata.Rdata')
+load('finaldata.Rdata')
 saveRDS(distance_change_pass, 'distance_pass.rds')
 
 distance_change_pass <- readRDS('distance_pass.rds') %>% 
