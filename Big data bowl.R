@@ -389,7 +389,7 @@ final_data <- final_data %>%
   left_join(yards) %>% 
   mutate(offenseFormation = as.factor(offenseFormation),
          down = as.factor(down)) 
-
+saveRDS(final_data, 'final_data.RDS')
 rushing_data <- final_data %>% filter(passResult == '')
 passing_data <- final_data %>% filter(passResult != '')
 
@@ -410,7 +410,8 @@ nfl_test <- testing(nfl_split)
 
 nfl_recipe <- recipe(playResult ~ offenseFormation + down + defendersInTheBox + 
                        yardsToGo + yardstoEnd + Scorediff + run_yards_per_attempt_off + 
-                       run_yards_per_attempt_def, data = nfl_training)
+                       run_yards_per_attempt_def, data = nfl_training) %>% 
+  step_dummy(all_nominal_predictors())
 
 nfl_prep <- prep(nfl_recipe)
 nfl_juice <- juice(nfl_prep)
@@ -446,19 +447,55 @@ nfl_pen_workflow <- workflow() %>%
 
 tidy_kfolds <- vfold_cv(nfl_training, v = 5, repeats = 5)
 
-glmnet_grid <- grid_max_entropy(
-  extract_parameter_set_dials(nfl_glm), 
-  size = 10)
 
-ctrl_grid <- control_stack_grid()
-ctrl_res <- control_stack_resamples()
+nfl_tune <- tune_grid(nfl_pen_workflow,
+                      resamples = tidy_kfolds, 
+                      grid = 10, 
+                      metrics = metric_set(rmse))
 
-nfl_tune_glm <- tune_grid(
-  nfl_pen_workflow,
+nfl_tune %>% show_best('rmse')
+
+nfl_pen_best_tune <- nfl_tune%>% select_best('rmse')
+
+nfl_finalize_wf <- nfl_pen_workflow %>% 
+  finalize_workflow(nfl_pen_best_tune)
+
+nfl_pen_test_pred <- nfl_finalize_wf %>% 
+  last_fit(nfl_split) %>% 
+  collect_predictions() 
+
+
+### XGBOOST
+nfl_xgb <- boost_tree(
+  mode = 'regression',
+  mtry = tune(),
+  trees = tune(),
+  min_n = tune(),
+  tree_depth = tune(),
+  learn_rate = tune(),
+  loss_reduction = tune(),
+  sample_size = tune(),
+  stop_iter = tune()) %>% 
+  set_engine("xgboost")
+
+nfl_xgb_param <- extract_parameter_set_dials(nfl_xgb) %>% 
+  update(mtry = mtry(c(1, 14)))
+
+xgboost_grid <- grid_max_entropy(
+  nfl_xgb_param, size = 16)
+
+nfl_xgb_wf <- workflow() %>% 
+  add_recipe(nfl_recipe) %>% 
+  add_model(nfl_xgb)
+
+nfl_xgb_tune_results <- tune_grid(
+  nfl_xgb_wf,
   resamples = tidy_kfolds,
-  grid = glmnet_grid,
-  control = ctrl_grid,
-  metrics = metric_set(rmse))
+  grid = xgboost_grid,
+  metrics = metric_set(rmse)
+)
+
+saveRDS(nfl_xgb_tune_results, "nfl_xgb_tune_results.rds")
 
 #distance_change_pass <- readRDS('distance_pass.rds') %>% 
 #Join box score stats by week and posTeam and DefTeam
