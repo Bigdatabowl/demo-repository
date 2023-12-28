@@ -74,3 +74,37 @@ nfl_xgb_tune_results <- tune_grid(
 )
 
 saveRDS(nfl_xgb_tune_results, "nfl_xgb_tune_results.rds")
+
+### Random Forest
+##Fit model with tuning grid
+nfl_ranger_tune <- rand_forest(trees = 150,
+                               mtry = tune(),
+                               min_n = tune()) %>%
+  set_mode("regression") %>%
+  set_engine("ranger", seed = 123, num.threads = 7)
+
+nfl_ranger_wf <- workflow() %>% 
+  add_recipe(nfl_recipe) %>% 
+  add_model(nfl_ranger_tune)
+
+tuneboth_param <- parameters(nfl_ranger_tune) %>% 
+  update(mtry = mtry(c(1, 15)))
+
+nfl_grid_tune <- grid_latin_hypercube(tuneboth_param, size=10)
+
+nfl.ranger.final <- ranger(playResult ~ ., data = nfl_training,
+                           num.trees       = 2000,
+                           mtry            = 9,
+                           min.node.size   = 10,
+                           replace         = TRUE,
+                           sample.fraction = 1,
+                           seed            = 123,
+                           respect.unordered.factors = 'order',
+                           importance      = 'impurity'
+)
+
+nfl.ranger.final
+
+nfl.ranger.testpred <- predict(nfl.ranger.final, data = nfl_test)
+##Test data RMSE
+rmse_vec(estimate=nfl.ranger.testpred$predictions, truth=pull(nfl_test[,c("playResult")]))
