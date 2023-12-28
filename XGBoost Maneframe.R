@@ -4,6 +4,8 @@ library(gganimate)
 library(nflverse)
 library(tidymodels)
 library(stacks)
+library(ranger)
+
 
 plays <- read.csv('plays.csv')
 final_data <- readRDS('final_data.RDS')
@@ -74,6 +76,23 @@ nfl_xgb_tune_results <- tune_grid(
 )
 
 saveRDS(nfl_xgb_tune_results, "nfl_xgb_tune_results.rds")
+
+nfl_xgb_best_tune_tidy <- nfl_xgb_tune_results %>%
+  select_best("rmse") 
+
+nfl_final_xgb_tidy <- finalize_model(nfl_xgb, nfl_xgb_best_tune_tidy)
+
+#Note that we need to update our workflow
+nfl_xgb_wf2 <- workflow() %>% 
+  add_recipe(nfl_recipe) %>% 
+  add_model(nfl_final_xgb_tidy)
+nfl_xgb_wf2
+
+final_xgb_tidy <- nfl_xgb_wf2 %>% 
+  last_fit(nfl_split, metrics = metric_set(rmse))
+
+xgboost.tidy.nfl.rmse <- final_xgb_tidy %>% collect_predictions() %>% rmse(estimate=.pred, truth=playResult) %>% pull(.estimate)
+
 
 ### Random Forest
 ##Fit model with tuning grid
