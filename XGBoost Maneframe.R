@@ -6,7 +6,6 @@ library(tidymodels)
 library(stacks)
 library(ranger)
 
-
 plays <- read.csv('plays.csv')
 final_data <- readRDS('final_data.RDS')
 
@@ -28,8 +27,8 @@ passing_data <- final_data %>% filter(passResult != '')
 ####
 
 nfl_split <- make_splits(
-  rushing_data %>% filter(week <= 7),
-  rushing_data %>% filter(week > 7))
+  passing_data %>% filter(week <= 7),
+  passing_data %>% filter(week > 7))
 
 
 
@@ -37,13 +36,15 @@ nfl_training <- training(nfl_split)
 nfl_test <- testing(nfl_split)
 
 nfl_recipe <- recipe(playResult ~ offenseFormation + down + defendersInTheBox + 
-                       yardsToGo + yardstoEnd + Scorediff + run_yards_per_attempt_off + 
-                       run_yards_per_attempt_def, data = nfl_training) %>% 
+                       yardsToGo + yardstoEnd + Scorediff + pass_yards_per_attempt_off + 
+                       pass_yards_per_attempt_def, data = nfl_training) %>% 
   step_dummy(all_nominal_predictors())
 
 nfl_prep <- prep(nfl_recipe)
 nfl_juice <- juice(nfl_prep)
+nfl_bake <- bake(nfl_prep, final_data)
 
+tidy_kfolds <- vfold_cv(nfl_training, v = 5, repeats = 5)
 
 ### XGBOOST
 nfl_xgb <- boost_tree(
@@ -62,18 +63,21 @@ nfl_xgb_param <- extract_parameter_set_dials(nfl_xgb) %>%
   update(mtry = mtry(c(1, 14)))
 
 xgboost_grid <- grid_max_entropy(
-  nfl_xgb_param, size = 16)
+  nfl_xgb_param, size = 50)
 
 nfl_xgb_wf <- workflow() %>% 
   add_recipe(nfl_recipe) %>% 
   add_model(nfl_xgb)
 
-nfl_xgb_tune_results <- tune_grid(
-  nfl_xgb_wf,
-  resamples = tidy_kfolds,
-  grid = xgboost_grid,
-  metrics = metric_set(rmse)
-)
+# nfl_xgb_tune_results <- tune_grid(
+#   nfl_xgb_wf,
+#   resamples = tidy_kfolds,
+#   grid = xgboost_grid,
+#   metrics = metric_set(rmse)
+# )
+
+save(nfl_xgb_tune_results, file = "xgb_tune.Rdata")
+load("xgb_tune.Rdata")
 
 saveRDS(nfl_xgb_tune_results, "nfl_xgb_tune_results.rds")
 
@@ -89,9 +93,30 @@ nfl_xgb_wf2 <- workflow() %>%
 nfl_xgb_wf2
 
 final_xgb_tidy <- nfl_xgb_wf2 %>% 
-  last_fit(nfl_split, metrics = metric_set(rmse))
+  last_fit(nfl_split, metrics = metric_set(rmse)) %>% 
+  collect_predictions() %>%
+  rmse(estimate=.pred, truth=playResult)
 
 xgboost.tidy.nfl.rmse <- final_xgb_tidy %>% collect_predictions() %>% rmse(estimate=.pred, truth=playResult) %>% pull(.estimate)
+
+
+xgb_final_workflow <- nfl_xgb_wf2 %>% 
+  finalize_workflow(nfl_xgb_best_tune_tidy)
+xgb_final_workflow
+
+xgb_fit <- xgb_final_workflow %>%
+  finalize_workflow(nfl_xgb_tune_results %>% select_best("rmse")) %>%
+  last_fit(nfl_split, 
+           metrics = metric_set(rmse)) %>% 
+  collect_metrics() %>% 
+  select(-c(".estimator", ".config")) %>%
+  rename(xgb_estimates = .estimate)
+
+predict_xgb <- xgb_final_workflow %>% 
+  last_fit(nfl_split) %>% 
+  collect_predictions
+
+predict_all_xgb <- predict(xgb_final_workflow %>% fit(nfl_juice), nfl_bake)
 
 
 ### Random Forest
@@ -109,8 +134,6 @@ nfl_ranger_wf <- workflow() %>%
 tuneboth_param <- parameters(nfl_ranger_tune) %>% 
   update(mtry = mtry(c(1, 15)))
 
-nfl_grid_tune <- grid_latin_hypercube(tuneboth_param, size=10)
-
 nfl.ranger.final <- ranger(playResult ~ ., data = nfl_training,
                            num.trees       = 2000,
                            mtry            = 9,
@@ -127,3 +150,19 @@ nfl.ranger.final
 nfl.ranger.testpred <- predict(nfl.ranger.final, data = nfl_test)
 ##Test data RMSE
 rmse_vec(estimate=nfl.ranger.testpred$predictions, truth=pull(nfl_test[,c("playResult")]))
+
+nfl_ranger_best_tune_tidy <- nfl.ranger.final %>% select_best("rmse")
+
+nfl_final_ranger_tidy <- finalize_model(nfl_ranger_tune, nfl_ranger_best_tune_tidy)
+
+#Note that we need to update our workflow
+nfl_ranger_wf3 <- workflow() %>% 
+  add_recipe(nfl_rec) %>% 
+  add_model(nfl_final_ranger_tidy)
+nfl_ranger_wf3
+
+
+nfl_ranger_wf3 %>% 
+  last_fit(nfl_split, metrics = metric_set(rmse)) %>% 
+  collect_predictions() %>%
+  rmse(estimate=.pred, truth=playResult)
