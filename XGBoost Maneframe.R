@@ -1,11 +1,5 @@
-library(tidyverse)
-library(ggplot2)
-library(gganimate)
-library(nflverse)
-library(tidymodels)
-library(stacks)
-library(ranger)
 
+setwd("C:/Users/roymy/OneDrive/바탕화~2-DESKTOP-TTPA583-6709/Big data bowl")
 plays <- read.csv('plays.csv')
 final_data <- readRDS('final_data.RDS')
 
@@ -76,7 +70,7 @@ nfl_xgb_wf <- workflow() %>%
 #   metrics = metric_set(rmse)
 # )
 
-save(nfl_xgb_tune_results, file = "xgb_tune.Rdata")
+#save(nfl_xgb_tune_results, file = "xgb_tune.Rdata")
 load("xgb_tune.Rdata")
 
 saveRDS(nfl_xgb_tune_results, "nfl_xgb_tune_results.rds")
@@ -113,10 +107,11 @@ xgb_fit <- xgb_final_workflow %>%
   rename(xgb_estimates = .estimate)
 
 predict_xgb <- xgb_final_workflow %>% 
-  last_fit(nfl_split) %>% 
-  collect_predictions
+  last_fit(nfl_split) 
 
-predict_all_xgb <- predict(xgb_final_workflow %>% fit(nfl_juice), nfl_bake)
+predict_all_xgb <- predict(xgb_final_workflow %>% fit(nfl_bake), data = nfl_bake)
+
+
 
 
 ### Random Forest
