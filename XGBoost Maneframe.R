@@ -1,5 +1,12 @@
+library(tidyverse)
+library(ggplot2)
+library(gganimate)
+library(nflverse)
+library(tidymodels)
+library(stacks)
+library(ranger)
 
-setwd("C:/Users/roymy/OneDrive/바탕화~2-DESKTOP-TTPA583-6709/Big data bowl")
+setwd("C:/Users/dhaks/OneDrive/Desktop/Big Data Bowl")
 plays <- read.csv('plays.csv')
 final_data <- readRDS('final_data.RDS')
 
@@ -78,40 +85,56 @@ saveRDS(nfl_xgb_tune_results, "nfl_xgb_tune_results.rds")
 nfl_xgb_best_tune_tidy <- nfl_xgb_tune_results %>%
   select_best("rmse") 
 
-nfl_final_xgb_tidy <- finalize_model(nfl_xgb, nfl_xgb_best_tune_tidy)
-
-#Note that we need to update our workflow
-nfl_xgb_wf2 <- workflow() %>% 
-  add_recipe(nfl_recipe) %>% 
-  add_model(nfl_final_xgb_tidy)
-nfl_xgb_wf2
-
-final_xgb_tidy <- nfl_xgb_wf2 %>% 
-  last_fit(nfl_split, metrics = metric_set(rmse)) %>% 
-  collect_predictions() %>%
-  rmse(estimate=.pred, truth=playResult)
-
-xgboost.tidy.nfl.rmse <- final_xgb_tidy %>% collect_predictions() %>% rmse(estimate=.pred, truth=playResult) %>% pull(.estimate)
-
-
-xgb_final_workflow <- nfl_xgb_wf2 %>% 
+nfl_final_wf <- nfl_xgb_wf %>% #this line works the same as finalize_model + add_model
   finalize_workflow(nfl_xgb_best_tune_tidy)
-xgb_final_workflow
 
-xgb_fit <- xgb_final_workflow %>%
-  finalize_workflow(nfl_xgb_tune_results %>% select_best("rmse")) %>%
-  last_fit(nfl_split, 
-           metrics = metric_set(rmse)) %>% 
-  collect_metrics() %>% 
-  select(-c(".estimator", ".config")) %>%
-  rename(xgb_estimates = .estimate)
+# nfl_final_xgb_tidy <- finalize_model(nfl_xgb, nfl_xgb_best_tune_tidy)
+# 
+# #Note that we need to update our workflow
+# nfl_xgb_wf2 <- workflow() %>% 
+#   add_recipe(nfl_recipe) %>% 
+#   add_model(nfl_final_xgb_tidy)
+# nfl_xgb_wf2
 
-predict_xgb <- xgb_final_workflow %>% 
-  last_fit(nfl_split) 
+nfl_xgb_test_pred <- nfl_final_wf %>% 
+  last_fit(nfl_split) %>% 
+  collect_predictions() 
 
-predict_all_xgb <- predict(xgb_final_workflow %>% fit(nfl_bake), data = nfl_bake)
+rmse(nfl_xgb_test_pred, playResult, .pred) #9.73
 
+# xgboost.tidy.nfl.rmse <- final_xgb_tidy %>% collect_predictions() %>% rmse(estimate=.pred, truth=playResult) %>% pull(.estimate)
+# 
+# 
+# xgb_final_workflow <- nfl_xgb_wf2 %>% 
+#   finalize_workflow(nfl_xgb_best_tune_tidy)
+# xgb_final_workflow
+# 
+# xgb_fit <- xgb_final_workflow %>%
+#   finalize_workflow(nfl_xgb_tune_results %>% select_best("rmse")) %>%
+#   last_fit(nfl_split, 
+#            metrics = metric_set(rmse)) %>% 
+#   collect_metrics() %>% 
+#   select(-c(".estimator", ".config")) %>%
+#   rename(xgb_estimates = .estimate)
+#
+# predict_xgb <- xgb_final_workflow %>% 
+#   last_fit(nfl_split) 
 
+xgb_final_model <- extract_fit_parsnip(nfl_final_wf %>% fit(nfl_training))
+
+all_plays_xgb_pred <- predict(xgb_final_model, nfl_bake %>% select(-playResult), type = 'numeric') %>% 
+  rename('predicted' = '.pred')
+
+#all_plays_pen_class <- cbind(predict(nba_pen_final_model, bake(nba_prep, model_data)), model_data$shot_made_flag)
+
+playResult_w_pred <- cbind(final_data, all_plays_xgb_pred)
+
+#Export playResult_w_pred, left_join with tackle play, and then we can see how many yards 
+#each player saves per tackle on avg.
+
+predict_all_xgb <- predict(nfl_final_wf %>% fit(nfl_juice), data = nfl_bake)
+
+#### XGBoost Model wins
 
 
 ### Random Forest
@@ -126,8 +149,8 @@ nfl_ranger_wf <- workflow() %>%
   add_recipe(nfl_recipe) %>% 
   add_model(nfl_ranger_tune)
 
-tuneboth_param <- parameters(nfl_ranger_tune) %>% 
-  update(mtry = mtry(c(1, 15)))
+# tuneboth_param <- parameters(nfl_ranger_tune) %>% 
+#   update(mtry = mtry(c(1, 15)))
 
 nfl.ranger.final <- ranger(playResult ~ ., data = nfl_training,
                            num.trees       = 2000,
@@ -161,3 +184,12 @@ nfl_ranger_wf3 %>%
   last_fit(nfl_split, metrics = metric_set(rmse)) %>% 
   collect_predictions() %>%
   rmse(estimate=.pred, truth=playResult)
+
+all_plays_rf_pred <- data.frame('prediction' = predict(nfl.ranger.final, final_data, type = 'response')[[1]])
+
+#all_plays_pen_class <- cbind(predict(nba_pen_final_model, bake(nba_prep, model_data)), model_data$shot_made_flag)
+
+playResult_w_pred <- cbind(final_data, all_plays_rf_pred)
+
+ModelMetrics::rmse( playResult_w_pred$playResult, playResult_w_pred$prediction)
+ModelMetrics::rmse(nfl_test$playResult,nfl.ranger.testpred[[1]]) #9.89

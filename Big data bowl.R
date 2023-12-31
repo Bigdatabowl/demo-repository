@@ -5,6 +5,18 @@ library(nflverse)
 library(tidymodels)
 library(stacks)
 
+
+#Export playResult_w_pred, left_join with tackle play, and then we can see how many yards 
+#each player saves per tackle on avg.
+
+# Find distance between ball snap and tackle, to see which players run the most to make tackles.
+# then we can group by positions and see which players run the most out of dline to make tackles,
+# which players run the most out of linebackers and which players run the most out of the secondary 
+# to make tackles
+
+
+
+
 setwd("C:/Users/roymy/OneDrive/바탕화~2-DESKTOP-TTPA583-6709/Big data bowl")
 setwd("C:/Users/dhaks/OneDrive/Desktop/Big Data Bowl")
 games <- read.csv("games.csv")
@@ -68,9 +80,10 @@ def_box <- team_box_def %>%
 
 
 tackler <- left_join(tackles, players, by = "nflId")
-tackleplay <- left_join(tackler, plays, by = c("gameId", "playId"))
+tackleplay <- left_join(tackler, plays, by = c("gameId", "playId")) %>% 
+  select(gameId, playId, nflId, tackle, assist, displayName)
 
-tackleplay <- tackleplay %>% 
+tackleplay <- tackleplay %>%  ########################### JOIN WITH THIS
   select(-birthDate, -collegeName) %>% 
   rename("tacklePlayer" = "displayName") %>% 
   rename("ballCarrier" = "ballCarrierDisplayName")
@@ -201,8 +214,9 @@ all_play <- function(week){
     group_by(gameId, playId, nflId, displayName) %>%
     filter(event %in% c("ball_snap", "first_contact", "tackle")) %>%
     mutate(
-      distance_change_first_contact = distance - lag(distance),
-      distance_change_tackle = distance - lag(distance, default = first(distance))
+      distance_change_first_contact = distance - lag(distance), #bs - fc
+      distance_change_tackle = distance - lag(distance, default = first(distance), #fc - tack
+      distance_change_snap_tackle = distance_change_first_contact + distance_change_tackle)
     )
   
   # distance_change <- distance_change %>% 
@@ -316,8 +330,9 @@ all_play <- function(week){
     group_by(gameId, playId, nflId, displayName) %>%
     filter(event %in% c("pass_arrived", "pass_outcome_caught", "first_contact", "tackle")) %>%
     mutate(
-      distance_change_first_contact = distance - lag(distance),
-      distance_change_tackle = distance - lag(distance, default = first(distance))
+      distance_change_first_contact = distance - lag(distance), #caught - fc
+      distance_change_tackle = distance - lag(distance, default = first(distance), #fc - tackle
+      distance_change_caught_tackle = distance_change_first_contact+distance_change_tackle)
     )
   
   # distance_change <- distance_change %>% 
@@ -390,6 +405,7 @@ final_data <- final_data %>%
   mutate(offenseFormation = as.factor(offenseFormation),
          down = as.factor(down)) 
 saveRDS(final_data, 'final_data.RDS')
+final_data <- readRDS('final_data.RDS')
 rushing_data <- final_data %>% filter(passResult == '')
 passing_data <- final_data %>% filter(passResult != '')
 
@@ -400,8 +416,8 @@ passing_data <- final_data %>% filter(passResult != '')
 ####
 
 nfl_split <- make_splits(
-  rushing_data %>% filter(week <= 7),
-  rushing_data %>% filter(week > 7))
+  passing_data %>% filter(week <= 7),
+  passing_data %>% filter(week > 7))
 
 
 
@@ -409,8 +425,8 @@ nfl_training <- training(nfl_split)
 nfl_test <- testing(nfl_split)
 
 nfl_recipe <- recipe(playResult ~ offenseFormation + down + defendersInTheBox + 
-                       yardsToGo + yardstoEnd + Scorediff + run_yards_per_attempt_off + 
-                       run_yards_per_attempt_def, data = nfl_training) %>% 
+                       yardsToGo + yardstoEnd + Scorediff + pass_yards_per_attempt_off + 
+                       pass_yards_per_attempt_def, data = nfl_training) %>% 
   step_dummy(all_nominal_predictors())
 
 nfl_prep <- prep(nfl_recipe)
@@ -430,9 +446,11 @@ test_pred <- nfl_workflow %>%
   last_fit(nfl_split) %>% 
   collect_predictions()
 
+rmse(test_pred, playResult, .pred)
+
 final_model <- extract_fit_parsnip(nfl_train_model)
 
-
+bake(nfl_prep, final_data)
 #penalized regression
 nfl_glm <- linear_reg(
   penalty = tune(),
@@ -464,6 +482,7 @@ nfl_pen_test_pred <- nfl_finalize_wf %>%
   last_fit(nfl_split) %>% 
   collect_predictions() 
 
+rmse(nfl_pen_test_pred, playResult, .pred)
 
 ### XGBOOST
 nfl_xgb <- boost_tree(
