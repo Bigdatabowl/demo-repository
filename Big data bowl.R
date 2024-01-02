@@ -180,15 +180,19 @@ all_play <- function(week){
   
   ##weektackdist and players
   weektackledistpos <- left_join(weektackledist, 
-                                 players %>% select(nflId, displayName, OD), 
+                                 players %>% select(nflId, displayName, OD, position), 
                                  by = c("nflId", "displayName"))
   
   
   #join plays(from plays only select gameid, playid, ballcarrierId) and weektackdist
   weekballcarrier <- left_join(weektackledistpos,
                                plays %>% select(gameId, playId, preSnapHomeScore, preSnapVisitorScore, yardlineNumber, 
-                                                preSnapHomeScore, preSnapVisitorScore),
+                                                preSnapHomeScore, preSnapVisitorScore, yardlineSide, possessionTeam),
                                by = c("gameId", "playId"))
+  
+  weekballcarrier <- weekballcarrier %>% 
+    group_by(gameId, playId)%>%
+    mutate(ballCarrierId = first(ballCarrierId, na_rm = T)) 
   
   #after joining mutate new column for who the ballcarrier is, if ballcarrierId == playerID then set it equal to 1
   weekballcarrier <- weekballcarrier %>% 
@@ -204,7 +208,25 @@ all_play <- function(week){
   
   ballcarrier <- weekballcarrier %>% 
     filter(event %in% c("ball_snap", "first_contact", "tackle"))
+
+  newdistance_change <- ballcarrier %>% 
+    filter(displayName == tacklePlayer) %>% 
+    group_by(gameId, playId) %>% 
+    filter(event %in% c("ball_snap", "tackle")) %>% 
+    mutate(
+      new_x = lag(x.player),
+      new_y = lag(y.player),
+      distance_covered = sqrt((new_x - x.player)^2 + (new_y - y.player)^2) 
+    )
   
+  newdistance_change <- newdistance_change %>% 
+    filter(event == "tackle") %>% 
+    select(gameId, playId, nflId, displayName, week, homeTeamAbbr, visitorTeamAbbr, preSnapHomeScore, preSnapVisitorScore, distance_covered)
+    
+  
+  
+  # distance_change <- distance_change %>% 
+  #   mutate(yards_to_FD = yardsToGo - last(playResult))
   
   distance_change <- ballcarrier %>%
     arrange(gameId, playId, nflId, time) %>%
@@ -215,11 +237,6 @@ all_play <- function(week){
       distance_change_tackle = distance - lag(distance, default = first(distance)), # fc - tack
       distance_change_snap_tackle = sum(distance_change_first_contact, distance_change_tackle, na.rm = TRUE)
     )
-  
-  
-  # distance_change <- distance_change %>% 
-  #   mutate(yards_to_FD = yardsToGo - last(playResult))
-  
   
   distance_change <- distance_change %>% 
     rename(Home = homeTeamAbbr,
@@ -285,8 +302,7 @@ all_play <- function(week){
   weekpassdist$distance <- sqrt((weekpassdist$x.player - weekpassdist$x.ball)^2 + (weekpassdist$y.player - weekpassdist$y.ball)^2)
   
   weektacklepassdist <- left_join(weekpassdist, tackle_passplay, by = c("gameId", "nflId", "playId"))
-  weektacklepassdist <- weektacklepassdist %>% 
-    select(-30, -31, -43:-48)
+  
   
   weektacklepassdist <- weektacklepassdist %>% 
     group_by(gameId, playId, event, frameId) %>% 
@@ -295,15 +311,19 @@ all_play <- function(week){
   
   ##weektackdist and players
   weektacklepassdistpos <- left_join(weektacklepassdist, 
-                                     players %>% select(nflId, displayName, OD), 
+                                     players %>% select(nflId, displayName, OD, position), 
                                      by = c("nflId", "displayName"))
   
   
   #join plays(from plays only select gameid, playid, ballcarrierId) and weektackdist
   weekpasscarrier <- left_join(weektacklepassdistpos,
-                               plays %>% select(gameId, playId, preSnapHomeScore, preSnapVisitorScore, yardlineNumber, 
-                                                preSnapHomeScore, preSnapVisitorScore),
+                               plays %>% select(gameId, playId, preSnapHomeScore, preSnapVisitorScore, yardlineNumber, yardlineSide,
+                                                preSnapHomeScore, preSnapVisitorScore, possessionTeam),
                                by = c("gameId", "playId"))
+  
+  weekpasscarrier <- weekpasscarrier %>% 
+    group_by(gameId, playId)%>%
+    mutate(ballCarrierId = first(ballCarrierId, na_rm = T))
   
   #after joining mutate new column for who the ballcarrier is, if ballcarrierId == playerID then set it equal to 1
   weekpasscarrier <- weekpasscarrier %>% 
@@ -319,6 +339,20 @@ all_play <- function(week){
   passcarrier <- weekpasscarrier %>% 
     filter(event %in% c("pass_arrived", "pass_outcome_caught", "first_contact", "tackle"))
   
+  
+  newdistance_change_pass <- passcarrier %>% 
+    filter(displayName == tacklePlayer) %>% 
+    group_by(gameId, playId) %>% 
+    filter(event %in% c("pass_outcome_caught", "tackle")) %>% 
+    mutate(
+      new_x = lag(x.player),
+      new_y = lag(y.player),
+      distance_covered = sqrt((new_x - x.player)^2 + (new_y - y.player)^2) 
+    )
+  
+  newdistance_change_pass <- newdistance_change_pass %>% 
+    filter(event == "pass_outcome_caught") %>% 
+    select(gameId, playId, nflId, displayName, week, homeTeamAbbr, visitorTeamAbbr, preSnapHomeScore, preSnapVisitorScore, distance_covered)
   
   distance_change_pass <- passcarrier %>%
     arrange(gameId, playId, nflId, time) %>%
@@ -356,6 +390,7 @@ all_play <- function(week){
     )
   
   distance <- bind_rows(distance_change, distance_change_pass)
+  newdistance <- bind_rows(newdistance_change, newdistance_change_pass)
   
   model_plays <- distance%>% 
     group_by(gameId, playId, offenseFormation, possessionTeam, defensiveTeam, week) %>% 
@@ -377,8 +412,7 @@ all_play <- function(week){
     left_join(def_box %>% select(defteam, week, pass_yards_per_attempt_def, run_yards_per_attempt_def),
               by = join_by(defensiveTeam == defteam, week == week))
   
-  return(model_data)
-  return(distance)
+  return (list(model_data, newdistance))
 }
 
 all_plays <- list()
