@@ -6,6 +6,10 @@ library(tidymodels)
 library(stacks)
 library(plotly)
 
+#Add Salaries and Teams
+
+#For Teams
+# Join tackler with plays %>% select(gameId, playId, defensiveTeam)
 
 #Export playResult_w_pred, left_join with tackle play, and then we can see how many yards 
 #each player saves per tackle on avg.
@@ -126,7 +130,6 @@ distance_w_pos <- distance %>%
   left_join(defense)
 saveRDS(distance_w_pos, 'distance_w_pos.rds')
 distance_w_pos <- readRDS('distance_w_pos.rds')
-
 linebackers <- distance_w_pos %>% 
   filter(Linebacker == 1) %>% 
   group_by(nflId, displayName, position) %>% 
@@ -150,19 +153,25 @@ plot_ly(linebackers, x=~ dist, y=~tackles, color=~position, type = 'scatter',
         text = paste('Player: ', linebackers$displayName,
                      '<br>Position: ', linebackers$position,
                      '<br>Number of Tackles: ', linebackers$tackles,
-                     '<br>Avg. Distance Covered: ', linebackers$dist))
+                     '<br>Avg. Distance Covered: ', linebackers$dist))%>% 
+  layout(xaxis = list(title = "Avg Distance Covered"), 
+         yaxis= list(title = "Number of Tackles"))
 
 plot_ly(dline, x=~ dist, y=~tackles, color=~position, type = 'scatter',
         text = paste('Player: ', dline$displayName,
                      '<br>Position: ', dline$position,
                      '<br>Number of Tackles: ', dline$tackles,
-                     '<br>Avg. Distance Covered: ', dline$dist))
+                     '<br>Avg. Distance Covered: ', dline$dist))%>% 
+  layout(xaxis = list(title = "Avg Distance Covered"), 
+         yaxis= list(title = "Number of Tackles"))
 
 plot_ly(secondary, x=~ dist, y=~tackles, color=~position, type = 'scatter',
         text = paste('Player: ', secondary$displayName,
                      '<br>Position: ', secondary$position,
                      '<br>Number of Tackles: ', secondary$tackles,
-                     '<br>Avg. Distance Covered: ', secondary$dist))
+                     '<br>Avg. Distance Covered: ', secondary$dist))%>% 
+  layout(xaxis = list(title = "Avg Distance Covered"), 
+         yaxis= list(title = "Number of Tackles"))
 
 resultpred_pass_XGB$yard_saved <- ifelse(resultpred_pass_XGB$passResult == "C",
                                          resultpred_pass_XGB$pass_predicted - resultpred_pass_XGB$playResult,
@@ -195,19 +204,25 @@ plot_ly(result_LB, x=~ yards_saved, y=~tackles, color=~position, type = 'scatter
         text = paste('Player: ', result_LB$tacklePlayer,
                      '<br>Position: ', result_LB$position,
                      '<br>Number of Tackles: ', result_LB$tackles,
-                     '<br>Avg. Yards Saved: ', result_LB$yards_saved))
+                     '<br>Avg. Yards Saved: ', result_LB$yards_saved))%>% 
+  layout(xaxis = list(title = "Yards Saved"), 
+         yaxis= list(title = "Number of Tackles"))
 
 plot_ly(result_dline, x=~ yards_saved, y=~tackles, color=~position, type = 'scatter',
-        text = paste('Player: ', result_dline$displayName,
+        text = paste('Player: ', result_dline$tacklePlayer,
                      '<br>Position: ', result_dline$position,
                      '<br>Number of Tackles: ', result_dline$tackles,
-                     '<br>Avg. Yards Saved: ', result_dline$yards_saved))
+                     '<br>Avg. Yards Saved: ', result_dline$yards_saved))%>% 
+  layout(xaxis = list(title = "Yards Saved"), 
+         yaxis= list(title = "Number of Tackles"))
 
 plot_ly(result_secondary, x=~ yards_saved, y=~tackles, color=~position, type = 'scatter',
-        text = paste('Player: ', result_secondary$displayName,
+        text = paste('Player: ', result_secondary$tacklePlayer,
                      '<br>Position: ', result_secondary$position,
                      '<br>Number of Tackles: ', result_secondary$tackles,
-                     '<br>Avg. Yards Saved: ', result_secondary$yards_saved))
+                     '<br>Avg. Yards Saved: ', result_secondary$yards_saved))%>% 
+  layout(xaxis = list(title = "Yards Saved"), 
+         yaxis= list(title = "Number of Tackles"))
 
 all_play <- function(week){
   
