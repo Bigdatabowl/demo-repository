@@ -6,7 +6,6 @@ library(tidymodels)
 library(stacks)
 library(ranger)
 
-setwd("C:/Users/dhaks/OneDrive/Desktop/Big Data Bowl")
 plays <- read.csv('plays.csv')
 final_data <- readRDS('final_data.RDS')
 
@@ -43,7 +42,7 @@ nfl_recipe <- recipe(playResult ~ offenseFormation + down + defendersInTheBox +
 
 nfl_prep <- prep(nfl_recipe)
 nfl_juice <- juice(nfl_prep)
-nfl_bake <- bake(nfl_prep, final_data)
+nfl_bake <- bake(nfl_prep, passing_data)
 
 tidy_kfolds <- vfold_cv(nfl_training, v = 5, repeats = 5)
 
@@ -70,19 +69,17 @@ nfl_xgb_wf <- workflow() %>%
   add_recipe(nfl_recipe) %>% 
   add_model(nfl_xgb)
 
-# nfl_xgb_tune_results <- tune_grid(
-#   nfl_xgb_wf,
-#   resamples = tidy_kfolds,
-#   grid = xgboost_grid,
-#   metrics = metric_set(rmse)
-# )
+nfl_xgb_tune_results_rush <- tune_grid(
+  nfl_xgb_wf,
+  resamples = tidy_kfolds,
+  grid = xgboost_grid,
+  metrics = metric_set(rmse)
+)
 
-#save(nfl_xgb_tune_results, file = "xgb_tune.Rdata")
-load("xgb_tune.Rdata")
-
-saveRDS(nfl_xgb_tune_results, "nfl_xgb_tune_results.rds")
-
-nfl_xgb_best_tune_tidy <- nfl_xgb_tune_results %>%
+saveRDS(nfl_xgb_tune_results_pass, "nfl_xgb_tune_results_pass.rds")
+saveRDS(nfl_xgb_tune_results_rush, "nfl_xgb_tune_results_rush.rds")
+nfl_xgb_tune_results_pass <- readRDS(file = "nfl_xgb_tune_results_pass.rds")
+nfl_xgb_best_tune_tidy <- nfl_xgb_tune_results_pass %>%
   select_best("rmse") 
 
 nfl_final_wf <- nfl_xgb_wf %>% #this line works the same as finalize_model + add_model
@@ -122,17 +119,22 @@ rmse(nfl_xgb_test_pred, playResult, .pred) #9.73
 
 xgb_final_model <- extract_fit_parsnip(nfl_final_wf %>% fit(nfl_training))
 
-all_plays_xgb_pred <- predict(xgb_final_model, nfl_bake %>% select(-playResult), type = 'numeric') %>% 
-  rename('predicted' = '.pred')
+all_plays_xgb_pred_pass <- predict(xgb_final_model, nfl_bake %>% select(-playResult), type = 'numeric') %>% 
+  rename('pass_predicted' = '.pred')
 
+all_plays_xgb_pred_rush <- predict(xgb_final_model, nfl_bake %>% select(-playResult), type = 'numeric') %>% 
+  rename('rush_predicted' = '.pred')
 #all_plays_pen_class <- cbind(predict(nba_pen_final_model, bake(nba_prep, model_data)), model_data$shot_made_flag)
+playResult_w_pred_xgb_pass <- cbind(passing_data, all_plays_xgb_pred_pass)
+save(playResult_w_pred_xgb_pass, file = "all_plays_xgb_pred_pass.rdata")
+load("all_plays_xgb_pred_pass.rdata")
+playResult_w_rush <- cbind(rushing_data, all_plays_xgb_pred_rush)
+playResult_w_pred <- rbind(playResult_w_pred_xgb_pass, playResult_w_rush)
+saveRDS(playResult_w_pred, file = "resultpred_pass_XGB.RDS")
 
-playResult_w_pred <- cbind(final_data, all_plays_xgb_pred)
 
 #Export playResult_w_pred, left_join with tackle play, and then we can see how many yards 
 #each player saves per tackle on avg.
-
-predict_all_xgb <- predict(nfl_final_wf %>% fit(nfl_juice), data = nfl_bake)
 
 #### XGBoost Model wins
 
@@ -151,7 +153,6 @@ nfl_ranger_wf <- workflow() %>%
 
 # tuneboth_param <- parameters(nfl_ranger_tune) %>% 
 #   update(mtry = mtry(c(1, 15)))
-
 nfl.ranger.final <- ranger(playResult ~ ., data = nfl_training,
                            num.trees       = 2000,
                            mtry            = 9,
@@ -189,7 +190,9 @@ all_plays_rf_pred <- data.frame('prediction' = predict(nfl.ranger.final, final_d
 
 #all_plays_pen_class <- cbind(predict(nba_pen_final_model, bake(nba_prep, model_data)), model_data$shot_made_flag)
 
-playResult_w_pred <- cbind(final_data, all_plays_rf_pred)
+playResult_w_pred_RF <- cbind(final_data, all_plays_rf_pred)
+saveRDS(playResult_w_pred_RF, file = "resultpred_RF.RDS")
+
 
 ModelMetrics::rmse( playResult_w_pred$playResult, playResult_w_pred$prediction)
 ModelMetrics::rmse(nfl_test$playResult,nfl.ranger.testpred[[1]]) #9.89
