@@ -6,6 +6,8 @@ library(tidymodels)
 library(stacks)
 library(ranger)
 
+setwd("C:/Users/roymy/OneDrive/바탕화~2-DESKTOP-TTPA583-6709/Big data bowl")
+
 plays <- read.csv('plays.csv')
 final_data <- readRDS('final_data.RDS')
 
@@ -131,6 +133,8 @@ load("all_plays_xgb_pred_pass.rdata")
 playResult_w_rush <- cbind(rushing_data, all_plays_xgb_pred_rush)
 playResult_w_pred <- rbind(playResult_w_pred_xgb_pass, playResult_w_rush)
 saveRDS(playResult_w_pred, file = "resultpred_pass_XGB.RDS")
+
+
 
 
 #Export playResult_w_pred, left_join with tackle play, and then we can see how many yards 

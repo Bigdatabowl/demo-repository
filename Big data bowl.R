@@ -126,6 +126,7 @@ distance_w_pos <- distance %>%
   left_join(defense)
 saveRDS(distance_w_pos, 'distance_w_pos.rds')
 distance_w_pos <- readRDS('distance_w_pos.rds')
+
 linebackers <- distance_w_pos %>% 
   filter(Linebacker == 1) %>% 
   group_by(nflId, displayName, position) %>% 
@@ -163,7 +164,50 @@ plot_ly(secondary, x=~ dist, y=~tackles, color=~position, type = 'scatter',
                      '<br>Number of Tackles: ', secondary$tackles,
                      '<br>Avg. Distance Covered: ', secondary$dist))
 
+resultpred_pass_XGB$yard_saved <- ifelse(resultpred_pass_XGB$passResult == "C",
+                                         resultpred_pass_XGB$pass_predicted - resultpred_pass_XGB$playResult,
+                                         resultpred_pass_XGB$rush_predicted - resultpred_pass_XGB$playResult)
 
+result <- left_join(resultpred_pass_XGB, tackleplay %>% select("gameId", "playId", "nflId", "tacklePlayer"), by = c("gameId", "playId"))
+
+result <- left_join(result, defense, by = c("nflId")) %>% 
+  select(-23)
+
+result_LB <- result %>% 
+  filter(Linebacker == 1) %>% 
+  group_by(nflId, tacklePlayer, position) %>% 
+  summarize(yards_saved = mean(yard_saved, na.rm = T),
+            tackles = n())
+
+result_dline <- result %>% 
+  filter(Dline == 1) %>% 
+  group_by(nflId, tacklePlayer, position) %>% 
+  summarize(yards_saved = mean(yard_saved, na.rm = T),
+            tackles = n())
+
+result_secondary <- result %>% 
+  filter(Secondary == 1) %>% 
+  group_by(nflId, tacklePlayer, position) %>% 
+  summarize(yards_saved = mean(yard_saved, na.rm = T),
+            tackles = n())
+
+plot_ly(result_LB, x=~ yards_saved, y=~tackles, color=~position, type = 'scatter',
+        text = paste('Player: ', result_LB$tacklePlayer,
+                     '<br>Position: ', result_LB$position,
+                     '<br>Number of Tackles: ', result_LB$tackles,
+                     '<br>Avg. Yards Saved: ', result_LB$yards_saved))
+
+plot_ly(result_dline, x=~ yards_saved, y=~tackles, color=~position, type = 'scatter',
+        text = paste('Player: ', result_dline$displayName,
+                     '<br>Position: ', result_dline$position,
+                     '<br>Number of Tackles: ', result_dline$tackles,
+                     '<br>Avg. Yards Saved: ', result_dline$yards_saved))
+
+plot_ly(result_secondary, x=~ yards_saved, y=~tackles, color=~position, type = 'scatter',
+        text = paste('Player: ', result_secondary$displayName,
+                     '<br>Position: ', result_secondary$position,
+                     '<br>Number of Tackles: ', result_secondary$tackles,
+                     '<br>Avg. Yards Saved: ', result_secondary$yards_saved))
 
 all_play <- function(week){
   
