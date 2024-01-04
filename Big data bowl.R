@@ -4,6 +4,7 @@ library(gganimate)
 library(nflverse)
 library(tidymodels)
 library(stacks)
+library(plotly)
 
 
 #Export playResult_w_pred, left_join with tackle play, and then we can see how many yards 
@@ -109,6 +110,59 @@ new_players <- data.frame(
 )
 
 players <- bind_rows(players, new_players)
+
+defense <- players %>% 
+  mutate(
+    Linebacker = ifelse(position %in% c("OLB", 'ILB', 'MLB'),1,0),
+    Dline = ifelse(position %in% c("DT", 'DE', 'NT'),1,0),
+    Secondary = ifelse(position %in% c("SS", 'FS', 'CB', 'DB'),1,0)
+  ) %>% 
+  filter(OD == 'Defense') %>% 
+  select(displayName, nflId, position, Linebacker, Dline, Secondary)
+
+
+
+distance_w_pos <- distance %>% 
+  left_join(defense)
+saveRDS(distance_w_pos, 'distance_w_pos.rds')
+distance_w_pos <- readRDS('distance_w_pos.rds')
+linebackers <- distance_w_pos %>% 
+  filter(Linebacker == 1) %>% 
+  group_by(nflId, displayName, position) %>% 
+  summarize(dist = mean(distance_covered, na.rm = T),
+            tackles = n())
+
+dline <- distance_w_pos %>% 
+  filter(Dline == 1) %>% 
+  group_by(nflId, displayName, position) %>% 
+  summarize(dist = mean(distance_covered, na.rm = T),
+            tackles = n())
+
+secondary <- distance_w_pos %>% 
+  filter(Secondary == 1) %>% 
+  group_by(nflId, displayName, position) %>% 
+  summarize(dist = mean(distance_covered, na.rm = T),
+            tackles = n())
+
+
+plot_ly(linebackers, x=~ dist, y=~tackles, color=~position, type = 'scatter',
+        text = paste('Player: ', linebackers$displayName,
+                     '<br>Position: ', linebackers$position,
+                     '<br>Number of Tackles: ', linebackers$tackles,
+                     '<br>Avg. Distance Covered: ', linebackers$dist))
+
+plot_ly(dline, x=~ dist, y=~tackles, color=~position, type = 'scatter',
+        text = paste('Player: ', dline$displayName,
+                     '<br>Position: ', dline$position,
+                     '<br>Number of Tackles: ', dline$tackles,
+                     '<br>Avg. Distance Covered: ', dline$dist))
+
+plot_ly(secondary, x=~ dist, y=~tackles, color=~position, type = 'scatter',
+        text = paste('Player: ', secondary$displayName,
+                     '<br>Position: ', secondary$position,
+                     '<br>Number of Tackles: ', secondary$tackles,
+                     '<br>Avg. Distance Covered: ', secondary$dist))
+
 
 
 all_play <- function(week){
