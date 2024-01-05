@@ -71,12 +71,12 @@ nfl_xgb_wf <- workflow() %>%
   add_recipe(nfl_recipe) %>% 
   add_model(nfl_xgb)
 
-nfl_xgb_tune_results_rush <- tune_grid(
-  nfl_xgb_wf,
-  resamples = tidy_kfolds,
-  grid = xgboost_grid,
-  metrics = metric_set(rmse)
-)
+# nfl_xgb_tune_results_pass <- tune_grid(
+#   nfl_xgb_wf,
+#   resamples = tidy_kfolds,
+#   grid = xgboost_grid,
+#   metrics = metric_set(rmse)
+# )
 
 saveRDS(nfl_xgb_tune_results_pass, "nfl_xgb_tune_results_pass.rds")
 saveRDS(nfl_xgb_tune_results_rush, "nfl_xgb_tune_results_rush.rds")
@@ -135,6 +135,18 @@ playResult_w_pred <- rbind(playResult_w_pred_xgb_pass, playResult_w_rush)
 saveRDS(playResult_w_pred, file = "resultpred_pass_XGB.RDS")
 
 
+pfun.xgb <- function(model, newdata){
+  newData_x <- xgb.DMatrix(data.matrix(newdata), missing = NA)
+  results <- predict(model, newData_x)
+  return(results)
+}
+
+predictor.xgb <- Predictor$new(model = xgb_final_model, data = nfl_bake[,-7], y = nfl_bake[,7],
+                               predict.fun = pfun.xgb)
+
+##Feature importance - uses permutations so takes a long time to run, but allows for CI's
+imp.xgb <- FeatureImp$new(predictor.xgb, loss = "rmse")
+plot(imp.xgb)
 
 
 #Export playResult_w_pred, left_join with tackle play, and then we can see how many yards 
