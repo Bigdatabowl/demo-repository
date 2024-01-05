@@ -5,17 +5,29 @@ library(nflverse)
 library(tidymodels)
 library(stacks)
 library(plotly)
-
+### Graphs : scatterplot salary vs yards saved(over/underpaid), boxplot teams vs yards saved, 
+### feature importance from XGB, Tables yards saved, Table for distance, 5-10 thresholds on tackles
 #Add Salaries and Teams
+sal <- load_contracts(file_type = getOption("nflreadr.prefer", default = "rds"))
+
+sal <-sal %>% 
+  mutate(OD = as.factor(ifelse(position %in% c("QB", "RB", "FB", "WR", "TE", "LT", "LG", "C", "RG", "RT"), "Offense", "Defense")))
+
+sal_D <- sal %>% 
+  filter(OD == "Defense") %>% 
+  right_join(players, by = c("player" = "displayName")) %>% 
+  filter(is_active == TRUE) %>% 
+  select(player, team, apy, nflId, position.y, OD.y) %>% 
+  rename(position = position.y,
+         OD = OD.y)
 
 #For Teams
 # Join tackler with plays %>% select(gameId, playId, defensiveTeam)
 
-#Export playResult_w_pred, left_join with tackle play, and then we can see how many yards 
-#each player saves per tackle on avg.
-pred_actual <- left_join(playResult_w_pred, tackleplay, by = c("gameId", "playId"))
-pred_actual <- pred_actual %>% 
-  mutate(save = predicted - playResult)
+tackler <- left_join(tackles, players, by = "nflId")
+tackleplay <- left_join(tackler, plays, by = c("gameId", "playId")) %>% 
+  select(gameId, playId, nflId, ballCarrierId, tackle, assist, displayName, passResult, defensiveTeam)
+
 
 # Find distance between ball snap and tackle, to see which players run the most to make tackles.
 # then we can group by positions and see which players run the most out of dline to make tackles,
@@ -89,7 +101,7 @@ def_box <- team_box_def %>%
 
 tackler <- left_join(tackles, players, by = "nflId")
 tackleplay <- left_join(tackler, plays, by = c("gameId", "playId")) %>% 
-  select(gameId, playId, nflId, ballCarrierId, tackle, assist, displayName, passResult)
+  select(gameId, playId, nflId, ballCarrierId, tackle, assist, displayName, passResult, defensiveTeam)
 
 tackleplay <- tackleplay %>%  ########################### JOIN WITH THIS
   rename("tacklePlayer" = "displayName")
@@ -127,7 +139,9 @@ defense <- players %>%
 
 
 distance_w_pos <- distance %>% 
-  left_join(defense)
+  left_join(defense) 
+
+
 saveRDS(distance_w_pos, 'distance_w_pos.rds')
 distance_w_pos <- readRDS('distance_w_pos.rds')
 linebackers <- distance_w_pos %>% 
@@ -177,10 +191,22 @@ resultpred_pass_XGB$yard_saved <- ifelse(resultpred_pass_XGB$passResult == "C",
                                          resultpred_pass_XGB$pass_predicted - resultpred_pass_XGB$playResult,
                                          resultpred_pass_XGB$rush_predicted - resultpred_pass_XGB$playResult)
 
+
+###yards saved to boxplot by team
+###scatterplot with yards saved compare to the salary overpaid/underpaid
+
 result <- left_join(resultpred_pass_XGB, tackleplay %>% select("gameId", "playId", "nflId", "tacklePlayer"), by = c("gameId", "playId"))
 
-result <- left_join(result, defense, by = c("nflId")) %>% 
-  select(-23)
+result <- left_join(result, defense, by = c("nflId")) 
+
+total_yards_saved_team <- result %>%
+  group_by(defensiveTeam) %>%
+  summarise(total_yards_saved = sum(yard_saved, na.rm = TRUE))
+
+plot_ly(total_yards_saved_team, x = ~defensiveTeam, y = ~total_yards_saved, type = "box") %>%
+  layout(title = "Total Yards Saved by Defensive Team",
+         xaxis = list(title = "Defensive Team"),
+         yaxis = list(title = "Total Yards Saved"))
 
 result_LB <- result %>% 
   filter(Linebacker == 1) %>% 
