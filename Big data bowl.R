@@ -21,7 +21,11 @@ sal_D <- sal %>%
   rename(position = position.y,
          OD = OD.y)
 
-#For Teams
+sal_D_yardsaved <- result %>% 
+  left_join(sal_D %>%  select(player, nflId, apy), by = c("nflId")) %>% 
+  filter(!is.na(apy))
+
+#For Teams#Fsal_Dor Teams
 # Join tackler with plays %>% select(gameId, playId, defensiveTeam)
 
 tackler <- left_join(tackles, players, by = "nflId")
@@ -199,11 +203,7 @@ result <- left_join(resultpred_pass_XGB, tackleplay %>% select("gameId", "playId
 
 result <- left_join(result, defense, by = c("nflId")) 
 
-total_yards_saved_team <- result %>%
-  group_by(defensiveTeam) %>%
-  summarise(total_yards_saved = sum(yard_saved, na.rm = TRUE))
-
-plot_ly(total_yards_saved_team, x = ~defensiveTeam, y = ~total_yards_saved, type = "box") %>%
+plot_ly(result, x = ~defensiveTeam, y = ~yard_saved, type = "box") %>%
   layout(title = "Total Yards Saved by Defensive Team",
          xaxis = list(title = "Defensive Team"),
          yaxis = list(title = "Total Yards Saved"))
