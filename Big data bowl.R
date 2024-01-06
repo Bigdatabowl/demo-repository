@@ -25,6 +25,15 @@ sal_D_yardsaved <- result %>%
   left_join(sal_D %>%  select(player, nflId, apy), by = c("nflId")) %>% 
   filter(!is.na(apy))
 
+plot_ly(sal_D_yardsaved, x = ~apy, y = ~yard_saved, type = 'scatter',
+        text = ~paste('Player: ', sal_D_yardsaved$tacklePlayer)) %>%
+  layout(xaxis = list(title = "Average per Year"),
+         yaxis = list(title = "Yards saved"))
+
+sal_D_apy_yardsaved <- sal_D_yardsaved %>%
+  group_by(player) %>%
+  summarize(total_yard_saved = sum(yard_saved), apy = first(apy))
+
 #For Teams#Fsal_Dor Teams
 # Join tackler with plays %>% select(gameId, playId, defensiveTeam)
 
