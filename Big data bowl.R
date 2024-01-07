@@ -6,50 +6,13 @@ library(tidymodels)
 library(stacks)
 library(plotly)
 
-
-#For Teams
-# Join tackler with plays %>% select(gameId, playId, defensiveTeam)
-
-#Export playResult_w_pred, left_join with tackle play, and then we can see how many yards 
-#each player saves per tackle on avg.
-pred_actual <- left_join(playResult_w_pred, tackleplay, by = c("gameId", "playId"))
-pred_actual <- pred_actual %>% 
-  mutate(save = predicted - playResult)
-
 # Find distance between ball snap and tackle, to see which players run the most to make tackles.
 # then we can group by positions and see which players run the most out of dline to make tackles,
 # which players run the most out of linebackers and which players run the most out of the secondary 
 # to make tackles
 
-
-
-
-setwd("C:/Users/roymy/OneDrive/바탕화~2-DESKTOP-TTPA583-6709/Big data bowl")
-setwd("C:/Users/dhaks/OneDrive/Desktop/Big Data Bowl")
-games <- read.csv("games.csv")
-players <- read.csv("players.csv")
-plays <- read.csv("plays.csv")
-tackles <- read.csv("tackles.csv")
-# week1 <- read.csv("tracking_week_1.csv")
-# week2 <- read.csv("tracking_week_2.csv")
-# week3 <- read.csv("tracking_week_3.csv")
-# week4 <- read.csv("tracking_week_4.csv")
-# week5 <- read.csv("tracking_week_5.csv")
-# week6 <- read.csv("tracking_week_6.csv")
-# week7 <- read.csv("tracking_week_7.csv")
-# week8 <- read.csv("tracking_week_8.csv")
-# week9 <- read.csv("tracking_week_9.csv")
-
-load("week1.Rdata")
-load("week2.Rdata")
-load("week3.Rdata")
-load("week4.Rdata")
-load("week5.Rdata")
-load("week6.Rdata")
-load("week7.Rdata")
-load("week8.Rdata")
-load("week9.Rdata")
-
+## Going to use play by play data frame from nflverse to find how many yards they gone though week1 to week9 in season 2022
+## For offensive stat, how many yards they made, for defensive stat, how many yards they saved
 pbp <- load_pbp(seasons = 2022)
 team_box_def <- pbp %>% 
   group_by(game_id, defteam, play_type, week) %>% 
@@ -86,11 +49,38 @@ def_box <- team_box_def %>%
          run_yards_per_attempt_def = lag(season_total_run_total_yards/season_total_run_total_plays))
 
 
+### Load the Data set, going to use those for this Kaggle Competition
+games <- read.csv("games.csv")
+players <- read.csv("players.csv")
+plays <- read.csv("plays.csv")
+tackles <- read.csv("tackles.csv")
+# week1 <- read.csv("tracking_week_1.csv")
+# week2 <- read.csv("tracking_week_2.csv")
+# week3 <- read.csv("tracking_week_3.csv")
+# week4 <- read.csv("tracking_week_4.csv")
+# week5 <- read.csv("tracking_week_5.csv")
+# week6 <- read.csv("tracking_week_6.csv")
+# week7 <- read.csv("tracking_week_7.csv")
+# week8 <- read.csv("tracking_week_8.csv")
+# week9 <- read.csv("tracking_week_9.csv")
+
+load("week1.Rdata")
+load("week2.Rdata")
+load("week3.Rdata")
+load("week4.Rdata")
+load("week5.Rdata")
+load("week6.Rdata")
+load("week7.Rdata")
+load("week8.Rdata")
+load("week9.Rdata")
+
+
+### Combine several data sets together to find who made tackle on what plays
 tackler <- left_join(tackles, players, by = "nflId")
 tackleplay <- left_join(tackler, plays, by = c("gameId", "playId")) %>% 
   select(gameId, playId, nflId, ballCarrierId, tackle, assist, displayName, passResult)
 
-tackleplay <- tackleplay %>%  ########################### JOIN WITH THIS
+tackleplay <- tackleplay %>%  
   rename("tacklePlayer" = "displayName")
 
 tackle_passplay <- tackleplay %>% 
@@ -105,6 +95,7 @@ tackle_scramble <- tackleplay %>%
 players <- players %>% 
   mutate(OD = as.factor(ifelse(position %in% c("QB", "T", "TE", "WR", "G", "RB", "C", "FB", "LS"), "Offense", "Defense")))
 
+### There were few players who were not on the data set, so we added
 new_players <- data.frame(
   displayName = c("Robby Anderson", "Cameron Sample", "Zachary Carter", "Daxton Hill", "Jacob Martin"),
   OD = c("Offense", "Defense", "Defense", "Defense", "Defense"),
@@ -114,157 +105,10 @@ new_players <- data.frame(
 
 players <- bind_rows(players, new_players)
 
-#Add Salaries and Teams
-sal <- load_contracts(file_type = getOption("nflreadr.prefer", default = "rds"))
-
-sal <-sal %>% 
-  mutate(OD = as.factor(ifelse(position %in% c("QB", "RB", "FB", "WR", "TE", "LT", "LG", "C", "RG", "RT"), "Offense", "Defense")))
-
-sal_D <- sal %>% 
-  filter(OD == "Defense") %>% 
-  right_join(players, by = c("player" = "displayName")) %>% 
-  filter(is_active == TRUE) %>% 
-  select(player, team, apy, nflId, position.y, OD.y) %>% 
-  rename(position = position.y,
-         OD = OD.y)
-
-sal_D_yardsaved <- result %>% 
-  left_join(sal_D %>%  select(player, nflId, apy), by = c("nflId")) %>% 
-  filter(!is.na(apy))
-
-sal_D_apy_yardsaved <- sal_D_yardsaved %>%
-  group_by(player) %>%
-  summarize(total_yard_saved = round(sum(yard_saved),2), 
-            apy = first(apy),
-            tackles = n()) %>% 
-  filter(tackles >= 10)
-
-saveRDS(sal_D_apy_yardsaved,'sal_D_apy_yardsaved.rds')
-
-plot_ly(sal_D_apy_yardsaved, x = ~apy, y = ~total_yard_saved, type = 'scatter', mode = 'markers',
-        text = ~paste('Player: ', sal_D_apy_yardsaved$player,
-                      '<br>Salary: ', sal_D_apy_yardsaved$apy,
-                      '<br>Total Yards Saved: ', sal_D_apy_yardsaved$total_yard_saved)) %>%
-  layout(xaxis = list(title = "Average per Year"),
-         yaxis = list(title = "Yards saved"))
-
-
-
-defense <- players %>% 
-  mutate(
-    Linebacker = ifelse(position %in% c("OLB", 'ILB', 'MLB'),1,0),
-    Dline = ifelse(position %in% c("DT", 'DE', 'NT'),1,0),
-    Secondary = ifelse(position %in% c("SS", 'FS', 'CB', 'DB'),1,0)
-  ) %>% 
-  filter(OD == 'Defense') %>% 
-  select(displayName, nflId, position, Linebacker, Dline, Secondary)
-
-
-
-distance_w_pos <- distance %>% 
-  left_join(defense)
-saveRDS(distance_w_pos, 'distance_w_pos.rds')
-distance_w_pos <- readRDS('distance_w_pos.rds')
-linebackers <- distance_w_pos %>% 
-  filter(Linebacker == 1) %>% 
-  group_by(nflId, displayName, position) %>% 
-  summarize(dist = mean(distance_covered, na.rm = T),
-            tackles = n())
-
-dline <- distance_w_pos %>% 
-  filter(Dline == 1) %>% 
-  group_by(nflId, displayName, position) %>% 
-  summarize(dist = mean(distance_covered, na.rm = T),
-            tackles = n())
-
-secondary <- distance_w_pos %>% 
-  filter(Secondary == 1) %>% 
-  group_by(nflId, displayName, position) %>% 
-  summarize(dist = mean(distance_covered, na.rm = T),
-            tackles = n())
-
-
-plot_ly(linebackers, x=~ dist, y=~tackles, color=~position, type = 'scatter',
-        text = paste('Player: ', linebackers$displayName,
-                     '<br>Position: ', linebackers$position,
-                     '<br>Number of Tackles: ', linebackers$tackles,
-                     '<br>Avg. Distance Covered: ', linebackers$dist))%>% 
-  layout(xaxis = list(title = "Avg Distance Covered"), 
-         yaxis= list(title = "Number of Tackles"))
-
-plot_ly(dline, x=~ dist, y=~tackles, color=~position, type = 'scatter',
-        text = paste('Player: ', dline$displayName,
-                     '<br>Position: ', dline$position,
-                     '<br>Number of Tackles: ', dline$tackles,
-                     '<br>Avg. Distance Covered: ', dline$dist))%>% 
-  layout(xaxis = list(title = "Avg Distance Covered"), 
-         yaxis= list(title = "Number of Tackles"))
-
-plot_ly(secondary, x=~ dist, y=~tackles, color=~position, type = 'scatter',
-        text = paste('Player: ', secondary$displayName,
-                     '<br>Position: ', secondary$position,
-                     '<br>Number of Tackles: ', secondary$tackles,
-                     '<br>Avg. Distance Covered: ', secondary$dist))%>% 
-  layout(xaxis = list(title = "Avg Distance Covered"), 
-         yaxis= list(title = "Number of Tackles"))
-
-resultpred_pass_XGB$yard_saved <- ifelse(resultpred_pass_XGB$passResult == "C",
-                                         resultpred_pass_XGB$pass_predicted - resultpred_pass_XGB$playResult,
-                                         resultpred_pass_XGB$rush_predicted - resultpred_pass_XGB$playResult)
-
-result <- left_join(resultpred_pass_XGB, tackleplay %>% select("gameId", "playId", "nflId", "tacklePlayer"), by = c("gameId", "playId"))
-
-result <- left_join(result, defense, by = c("nflId")) 
-
-total_yards_saved_team <- result %>%
-  group_by(defensiveTeam) %>%
-  summarise(total_yards_saved = sum(yard_saved, na.rm = TRUE))
-
-saveRDS(result, 'results.rds')
-saveRDS(total_yards_saved_team, 'total_yards_saved_team.rds')
-
-result_LB <- result %>% 
-  filter(Linebacker == 1) %>% 
-  group_by(nflId, tacklePlayer, position) %>% 
-  summarize(yards_saved = mean(yard_saved, na.rm = T),
-            tackles = n())
-
-result_dline <- result %>% 
-  filter(Dline == 1) %>% 
-  group_by(nflId, tacklePlayer, position) %>% 
-  summarize(yards_saved = mean(yard_saved, na.rm = T),
-            tackles = n())
-
-result_secondary <- result %>% 
-  filter(Secondary == 1) %>% 
-  group_by(nflId, tacklePlayer, position) %>% 
-  summarize(yards_saved = mean(yard_saved, na.rm = T),
-            tackles = n())
-
-plot_ly(result_LB, x=~ yards_saved, y=~tackles, color=~position, type = 'scatter',
-        text = paste('Player: ', result_LB$tacklePlayer,
-                     '<br>Position: ', result_LB$position,
-                     '<br>Number of Tackles: ', result_LB$tackles,
-                     '<br>Avg. Yards Saved: ', result_LB$yards_saved))%>% 
-  layout(xaxis = list(title = "Yards Saved"), 
-         yaxis= list(title = "Number of Tackles"))
-
-plot_ly(result_dline, x=~ yards_saved, y=~tackles, color=~position, type = 'scatter',
-        text = paste('Player: ', result_dline$tacklePlayer,
-                     '<br>Position: ', result_dline$position,
-                     '<br>Number of Tackles: ', result_dline$tackles,
-                     '<br>Avg. Yards Saved: ', result_dline$yards_saved))%>% 
-  layout(xaxis = list(title = "Yards Saved"), 
-         yaxis= list(title = "Number of Tackles"))
-
-plot_ly(result_secondary, x=~ yards_saved, y=~tackles, color=~position, type = 'scatter',
-        text = paste('Player: ', result_secondary$tacklePlayer,
-                     '<br>Position: ', result_secondary$position,
-                     '<br>Number of Tackles: ', result_secondary$tackles,
-                     '<br>Avg. Yards Saved: ', result_secondary$yards_saved))%>% 
-  layout(xaxis = list(title = "Yards Saved"), 
-         yaxis= list(title = "Number of Tackles"))
-
+### To combine all weeks together, we make a function
+### We are trying to find how many yards does the each player moved to make a tackle, called distance
+### To find the distance, in function, we collect the data of the ball carriers and all defense players on each playId
+### We divided the whole plays into rush plays and pass plays and combine those plays all together later
 all_play <- function(week){
   
   weekrushtackle <-tackle_rushplay %>%
@@ -599,12 +443,14 @@ all_play <- function(week){
 
 all_plays <- list()
 
+### Combine all 9 weeks together
 for (n in 1:9) {
   week_data <- get(paste0("week", n))
   all_plays[[n]] <- all_play(week_data)
 }
-
 saveRDS(all_plays, 'all_plays.RDS')
+
+
 final_data <- data.frame()
 distance <- data.frame()
 for (n in 1:9) {
@@ -618,6 +464,175 @@ load('finaldata.Rdata')
 saveRDS(distance, 'distance.rds')
 yards <- plays %>% 
   select(gameId, playId, playResult, passResult)
+
+
+### From this project, we mostly focus on the players who are on defense side
+defense <- players %>% 
+  mutate(
+    Linebacker = ifelse(position %in% c("OLB", 'ILB', 'MLB'),1,0),
+    Dline = ifelse(position %in% c("DT", 'DE', 'NT'),1,0),
+    Secondary = ifelse(position %in% c("SS", 'FS', 'CB', 'DB'),1,0)
+  ) %>% 
+  filter(OD == 'Defense') %>% 
+  select(displayName, nflId, position, Linebacker, Dline, Secondary)
+
+
+distance_w_pos <- distance %>% 
+  left_join(defense)
+saveRDS(distance_w_pos, 'distance_w_pos.rds')
+distance_w_pos <- readRDS('distance_w_pos.rds')
+linebackers <- distance_w_pos %>% 
+  filter(Linebacker == 1) %>% 
+  group_by(nflId, displayName, position) %>% 
+  summarize(dist = mean(distance_covered, na.rm = T),
+            tackles = n())
+
+dline <- distance_w_pos %>% 
+  filter(Dline == 1) %>% 
+  group_by(nflId, displayName, position) %>% 
+  summarize(dist = mean(distance_covered, na.rm = T),
+            tackles = n())
+
+secondary <- distance_w_pos %>% 
+  filter(Secondary == 1) %>% 
+  group_by(nflId, displayName, position) %>% 
+  summarize(dist = mean(distance_covered, na.rm = T),
+            tackles = n())
+
+
+plot_ly(linebackers, x=~ dist, y=~tackles, color=~position, type = 'scatter',
+        text = paste('Player: ', linebackers$displayName,
+                     '<br>Position: ', linebackers$position,
+                     '<br>Number of Tackles: ', linebackers$tackles,
+                     '<br>Avg. Distance Covered: ', linebackers$dist))%>% 
+  layout(xaxis = list(title = "Avg Distance Covered"), 
+         yaxis= list(title = "Number of Tackles"))
+
+plot_ly(dline, x=~ dist, y=~tackles, color=~position, type = 'scatter',
+        text = paste('Player: ', dline$displayName,
+                     '<br>Position: ', dline$position,
+                     '<br>Number of Tackles: ', dline$tackles,
+                     '<br>Avg. Distance Covered: ', dline$dist))%>% 
+  layout(xaxis = list(title = "Avg Distance Covered"), 
+         yaxis= list(title = "Number of Tackles"))
+
+plot_ly(secondary, x=~ dist, y=~tackles, color=~position, type = 'scatter',
+        text = paste('Player: ', secondary$displayName,
+                     '<br>Position: ', secondary$position,
+                     '<br>Number of Tackles: ', secondary$tackles,
+                     '<br>Avg. Distance Covered: ', secondary$dist))%>% 
+  layout(xaxis = list(title = "Avg Distance Covered"), 
+         yaxis= list(title = "Number of Tackles"))
+
+resultpred_pass_XGB$yard_saved <- ifelse(resultpred_pass_XGB$passResult == "C",
+                                         resultpred_pass_XGB$pass_predicted - resultpred_pass_XGB$playResult,
+                                         resultpred_pass_XGB$rush_predicted - resultpred_pass_XGB$playResult)
+
+result <- left_join(resultpred_pass_XGB, tackleplay %>% select("gameId", "playId", "nflId", "tacklePlayer"), by = c("gameId", "playId"))
+
+result <- left_join(result, defense, by = c("nflId")) 
+
+total_yards_saved_team <- result %>%
+  group_by(defensiveTeam) %>%
+  summarise(total_yards_saved = sum(yard_saved, na.rm = TRUE))
+
+saveRDS(result, 'results.rds')
+saveRDS(total_yards_saved_team, 'total_yards_saved_team.rds')
+
+
+result_LB <- result %>% 
+  filter(Linebacker == 1) %>% 
+  group_by(nflId, tacklePlayer, position) %>% 
+  summarize(yards_saved = mean(yard_saved, na.rm = T),
+            tackles = n())
+
+result_dline <- result %>% 
+  filter(Dline == 1) %>% 
+  group_by(nflId, tacklePlayer, position) %>% 
+  summarize(yards_saved = mean(yard_saved, na.rm = T),
+            tackles = n())
+
+result_secondary <- result %>% 
+  filter(Secondary == 1) %>% 
+  group_by(nflId, tacklePlayer, position) %>% 
+  summarize(yards_saved = mean(yard_saved, na.rm = T),
+            tackles = n())
+
+plot_ly(result_LB, x=~ yards_saved, y=~tackles, color=~position, type = 'scatter',
+        text = paste('Player: ', result_LB$tacklePlayer,
+                     '<br>Position: ', result_LB$position,
+                     '<br>Number of Tackles: ', result_LB$tackles,
+                     '<br>Avg. Yards Saved: ', result_LB$yards_saved))%>% 
+  layout(xaxis = list(title = "Yards Saved"), 
+         yaxis= list(title = "Number of Tackles"))
+
+plot_ly(result_dline, x=~ yards_saved, y=~tackles, color=~position, type = 'scatter',
+        text = paste('Player: ', result_dline$tacklePlayer,
+                     '<br>Position: ', result_dline$position,
+                     '<br>Number of Tackles: ', result_dline$tackles,
+                     '<br>Avg. Yards Saved: ', result_dline$yards_saved))%>% 
+  layout(xaxis = list(title = "Yards Saved"), 
+         yaxis= list(title = "Number of Tackles"))
+
+plot_ly(result_secondary, x=~ yards_saved, y=~tackles, color=~position, type = 'scatter',
+        text = paste('Player: ', result_secondary$tacklePlayer,
+                     '<br>Position: ', result_secondary$position,
+                     '<br>Number of Tackles: ', result_secondary$tackles,
+                     '<br>Avg. Yards Saved: ', result_secondary$yards_saved))%>% 
+  layout(xaxis = list(title = "Yards Saved"), 
+         yaxis= list(title = "Number of Tackles"))
+
+
+#Add Salaries data set to figure that players who get paid more saved more yards compared to the players who get paid less
+sal <- load_contracts(file_type = getOption("nflreadr.prefer", default = "rds"))
+
+sal <-sal %>% 
+  mutate(OD = as.factor(ifelse(position %in% c("QB", "RB", "FB", "WR", "TE", "LT", "LG", "C", "RG", "RT"), "Offense", "Defense")))
+
+sal_D <- sal %>% 
+  filter(OD == "Defense") %>% 
+  right_join(players, by = c("player" = "displayName")) %>% 
+  filter(is_active == TRUE) %>% 
+  select(player, team, apy, nflId, position.y, OD.y) %>% 
+  rename(position = position.y,
+         OD = OD.y)
+
+sal_D_yardsaved <- result %>% 
+  left_join(sal_D %>%  select(player, nflId, apy), by = c("nflId")) %>% 
+  filter(!is.na(apy))
+
+sal_D_apy_yardsaved <- sal_D_yardsaved %>%
+  group_by(player) %>%
+  summarize(total_yard_saved = round(sum(yard_saved),2), 
+            apy = first(apy),
+            tackles = n()) %>% 
+  filter(tackles >= 10)
+
+saveRDS(sal_D_apy_yardsaved,'sal_D_apy_yardsaved.rds')
+
+plot_ly(sal_D_apy_yardsaved, x = ~apy, y = ~total_yard_saved, type = 'scatter', mode = 'markers',
+        text = ~paste('Player: ', sal_D_apy_yardsaved$player,
+                      '<br>Salary: ', sal_D_apy_yardsaved$apy,
+                      '<br>Total Yards Saved: ', sal_D_apy_yardsaved$total_yard_saved)) %>%
+  layout(xaxis = list(title = "Average per Year"),
+         yaxis = list(title = "Yards saved"))
+
+
+
+
+
+
+
+
+
+
+
+
+############## We could remove all codes below, those are all in XGBoost ManeFrame code
+
+
+
+
 
 final_data <- final_data %>% 
   filter(week > 1) %>% 

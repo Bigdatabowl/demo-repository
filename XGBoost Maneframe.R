@@ -156,6 +156,8 @@ saveRDS(xgb_final_model, 'xgb_final_model.rds')
 library(imager)
 x <- load.image('Variable_Importance.png')
 plot(x)
+
+
 ### Random Forest
 ##Fit model with tuning grid
 nfl_ranger_tune <- rand_forest(trees = 150,
